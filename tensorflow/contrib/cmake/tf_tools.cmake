@@ -26,16 +26,16 @@ add_executable(${proto_text}
     ${tf_tools_proto_text_srcs}
     $<TARGET_OBJECTS:tf_core_lib>
 )
+install(TARGETS ${proto_text}
+    EXPORT TensorflowToolsTargets
+    RUNTIME DESTINATION "libexec/tensorflow")
 
 target_link_libraries(${proto_text} PUBLIC
   ${tensorflow_EXTERNAL_LIBRARIES}
-  tf_protos_cc
+  tensorflow_protos
 )
 
 add_dependencies(${proto_text} tf_core_lib)
-if(tensorflow_ENABLE_GRPC_SUPPORT)
-    add_dependencies(${proto_text} grpc)
-endif(tensorflow_ENABLE_GRPC_SUPPORT)
 
 file(GLOB_RECURSE tf_tools_transform_graph_lib_srcs
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/*.h"
@@ -65,20 +65,11 @@ set(transform_graph "transform_graph")
 
 add_executable(${transform_graph}
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/transform_graph_main.cc"
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_lib>
-    $<TARGET_OBJECTS:tf_core_cpu>
-    $<TARGET_OBJECTS:tf_core_framework>
-    $<TARGET_OBJECTS:tf_core_ops>
-    $<TARGET_OBJECTS:tf_core_direct_session>
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_kernels>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_core_kernels_cpu_only>>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
 )
 
 target_link_libraries(${transform_graph} PUBLIC
-  tf_protos_cc
+  tensorflow
+  tensorflow_protos
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
@@ -87,20 +78,11 @@ set(summarize_graph "summarize_graph")
 
 add_executable(${summarize_graph}
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/summarize_graph_main.cc"
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_lib>
-    $<TARGET_OBJECTS:tf_core_cpu>
-    $<TARGET_OBJECTS:tf_core_framework>
-    $<TARGET_OBJECTS:tf_core_ops>
-    $<TARGET_OBJECTS:tf_core_direct_session>
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_kernels>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_core_kernels_cpu_only>>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
 )
 
 target_link_libraries(${summarize_graph} PUBLIC
-  tf_protos_cc
+  tensorflow
+  tensorflow_protos
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
@@ -109,20 +91,11 @@ set(compare_graphs "compare_graphs")
 
 add_executable(${compare_graphs}
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/compare_graphs.cc"
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_lib>
-    $<TARGET_OBJECTS:tf_core_cpu>
-    $<TARGET_OBJECTS:tf_core_framework>
-    $<TARGET_OBJECTS:tf_core_ops>
-    $<TARGET_OBJECTS:tf_core_direct_session>
-    $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
-    $<TARGET_OBJECTS:tf_core_kernels>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_core_kernels_cpu_only>>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
 )
 
 target_link_libraries(${compare_graphs} PUBLIC
-  tf_protos_cc
+  tensorflow
+  tensorflow_protos
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
@@ -132,18 +105,18 @@ set(benchmark_model "benchmark_model")
 add_executable(${benchmark_model}
     "${tensorflow_source_dir}/tensorflow/tools/benchmark/benchmark_model.cc"
     "${tensorflow_source_dir}/tensorflow/tools/benchmark/benchmark_model_main.cc"
-    $<TARGET_OBJECTS:tf_core_lib>
-    $<TARGET_OBJECTS:tf_core_cpu>
-    $<TARGET_OBJECTS:tf_core_framework>
-    $<TARGET_OBJECTS:tf_core_ops>
-    $<TARGET_OBJECTS:tf_core_direct_session>
-    $<TARGET_OBJECTS:tf_core_kernels>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_core_kernels_cpu_only>>
-    $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
 )
 
 target_link_libraries(${benchmark_model} PUBLIC
-  tf_protos_cc
+  tensorflow
+  tensorflow_protos
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
+install(TARGETS ${transform_graph} ${summarize_graph} ${compare_graphs} ${benchmark_model}
+    EXPORT TensorflowToolsTargets
+    LIBRARY DESTINATION "lib${LIBSUFFIX}"
+    RUNTIME DESTINATION "bin")
+# Create TensorflowToolsConfig.cmake
+EXPORT(TARGETS ${transform_graph} ${summarize_graph} ${compare_graphs} ${benchmark_model} FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowToolsTargets.cmake")
+INSTALL(EXPORT TensorflowToolsTargets DESTINATION "share/tensorflow/cmake")

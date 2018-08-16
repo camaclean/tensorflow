@@ -38,7 +38,7 @@ else(tensorflow_BUILD_ALL_KERNELS)
   )
 endif(tensorflow_BUILD_ALL_KERNELS)
 
-if(tensorflow_BUILD_CONTRIB_KERNELS)
+if(tensorflow_BUILD_CONTRIB_KERNELS AND WIN32)
   set(tf_contrib_kernels_srcs
       "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/model_ops.cc"
       "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/prediction_ops.cc"
@@ -121,7 +121,7 @@ if(tensorflow_BUILD_CONTRIB_KERNELS)
       "${tensorflow_source_dir}/tensorflow/contrib/tpu/ops/tpu_configuration_ops.cc"
     )
   list(APPEND tf_core_kernels_srcs ${tf_contrib_kernels_srcs})
-endif(tensorflow_BUILD_CONTRIB_KERNELS)
+endif(tensorflow_BUILD_CONTRIB_KERNELS AND WIN32)
 
 if(NOT tensorflow_ENABLE_SSL_SUPPORT)
   # Cloud libraries require boringssl.
@@ -202,16 +202,24 @@ endif(WIN32 AND tensorflow_ENABLE_GPU)
 add_library(tf_core_kernels OBJECT ${tf_core_kernels_srcs})
 add_dependencies(tf_core_kernels tf_core_cpu)
 
-if(WIN32)
-  target_compile_options(tf_core_kernels PRIVATE /MP)
-  if (tensorflow_ENABLE_GPU)
-    set_source_files_properties(${tf_core_gpu_kernels_srcs} PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ)
-    set(tf_core_gpu_kernels_lib tf_core_gpu_kernels)
-    cuda_add_library(${tf_core_gpu_kernels_lib} ${tf_core_gpu_kernels_srcs})
+if (tensorflow_ENABLE_GPU)
+  if(WIN32)
+    target_compile_options(tf_core_kernels PRIVATE /MP)
+  endif()
+  set_source_files_properties(${tf_core_gpu_kernels_srcs} PROPERTIES CUDA_SOURCE_PROPERTY_FORMAT OBJ)
+  set(tf_core_gpu_kernels_lib tf_core_gpu_kernels)
+  cuda_add_library(${tf_core_gpu_kernels_lib} ${tf_core_gpu_kernels_srcs})
+  if (WIN32)
     set_target_properties(${tf_core_gpu_kernels_lib}
                           PROPERTIES DEBUG_POSTFIX ""
                           COMPILE_FLAGS "${TF_REGULAR_CXX_FLAGS}"
     )
-    add_dependencies(${tf_core_gpu_kernels_lib} tf_core_cpu)
+  else()
+    set_target_properties(${tf_core_gpu_kernels_lib}
+                          PROPERTIES DEBUG_POSTFIX ""
+                          COMPILE_FLAGS "${TF_REGULAR_CXX_FLAGS}"
+                          POSITION_INDEPENDENT_CODE ON
+    )
   endif()
+  add_dependencies(${tf_core_gpu_kernels_lib} tf_core_cpu)
 endif()

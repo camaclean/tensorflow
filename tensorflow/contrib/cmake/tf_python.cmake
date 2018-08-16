@@ -68,6 +68,7 @@ function(RELATIVE_PROTOBUF_GENERATE_PYTHON ROOT_DIR SRCS)
     message(SEND_ERROR "Error: RELATIVE_PROTOBUF_GENERATE_PYTHON() called without any proto files")
     return()
   endif()
+  message("Protobuf_PROTOC_EXECUTABLE: ${Protobuf_PROTOC_EXECUTABLE}")
 
   set(${SRCS})
   foreach(FIL ${ARGN})
@@ -79,45 +80,13 @@ function(RELATIVE_PROTOBUF_GENERATE_PYTHON ROOT_DIR SRCS)
     list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${REL_DIR}/${FIL_WE}_pb2.py")
     add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${REL_DIR}/${FIL_WE}_pb2.py"
-      COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+      #COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
+      COMMAND ${Protobuf_PROTOC_EXECUTABLE}
       ARGS --python_out  ${CMAKE_CURRENT_BINARY_DIR}/tf_python/ -I ${ROOT_DIR} -I ${PROTOBUF_INCLUDE_DIRS} ${ABS_FIL}
-      DEPENDS ${PROTOBUF_PROTOC_EXECUTABLE} protobuf
       COMMENT "Running Python protocol buffer compiler on ${FIL}"
       VERBATIM )
   endforeach()
   set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-endfunction()
-
-function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
-  if(NOT ARGN)
-    message(SEND_ERROR "Error: RELATIVE_PROTOBUF_GENERATE_CPP() called without any proto files")
-    return()
-  endif()
-
-  set(${SRCS})
-  set(${HDRS})
-  foreach(FIL ${ARGN})
-    set(ABS_FIL ${ROOT_DIR}/${FIL})
-    get_filename_component(FIL_WE ${FIL} NAME_WE)
-    get_filename_component(FIL_DIR ${ABS_FIL} PATH)
-    file(RELATIVE_PATH REL_DIR ${ROOT_DIR} ${FIL_DIR})
-
-    list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc")
-    list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h")
-
-    add_custom_command(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc"
-             "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
-      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
-      ARGS --cpp_out  ${CMAKE_CURRENT_BINARY_DIR} -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
-      DEPENDS ${ABS_FIL} protobuf
-      COMMENT "Running C++ protocol buffer compiler on ${FIL}"
-      VERBATIM )
-  endforeach()
-
-  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
 file(GLOB_RECURSE tf_protos_python_srcs RELATIVE ${tensorflow_source_dir}
@@ -126,8 +95,8 @@ file(GLOB_RECURSE tf_protos_python_srcs RELATIVE ${tensorflow_source_dir}
     "${tensorflow_source_dir}/tensorflow/python/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/proto/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/decision_trees/proto/*.proto"
-    "${tensorflow_source_dir}/tensorflow/contrib/session_bundle/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/tensor_forest/proto/*.proto"
+    "${tensorflow_source_dir}/tensorflow/contrib/session_bundle/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/tensorboard/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/tpu/profiler/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/training/*.proto"
@@ -140,18 +109,22 @@ RELATIVE_PROTOBUF_GENERATE_PYTHON(
 # can cause benign-but-failing-on-Windows-due-to-file-locking conflicts
 # when two rules attempt to generate the same file.
 file(GLOB_RECURSE tf_python_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
-    "${tensorflow_source_dir}/tensorflow/core/profiler/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/core/profiler/*.proto"
     "${tensorflow_source_dir}/tensorflow/python/*.proto"
-    "${tensorflow_source_dir}/tensorflow/contrib/session_bundle/*.proto"
-    "${tensorflow_source_dir}/tensorflow/contrib/tensorboard/*.proto"
-    "${tensorflow_source_dir}/tensorflow/contrib/training/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/proto/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/decision_trees/proto/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/tensor_forest/proto/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/session_bundle/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/tensorboard/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/tpu/profiler/*.proto"
+#    "${tensorflow_source_dir}/tensorflow/contrib/training/*.proto"
 )
 RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
     ${tensorflow_source_dir} ${tf_python_protos_cc_srcs}
 )
 
 add_library(tf_python_protos_cc ${PROTO_SRCS} ${PROTO_HDRS})
-add_dependencies(tf_python_protos_cc tf_protos_cc)
+add_dependencies(tf_python_protos_cc tensorflow_protos)
 
 # tf_python_touchup_modules adds empty __init__.py files to all
 # directories containing Python code, so that Python will recognize
@@ -193,10 +166,12 @@ endfunction()
 
 add_python_module("tensorflow")
 add_python_module("tensorflow/core")
+add_python_module("tensorflow/core/debug")
 add_python_module("tensorflow/core/example")
 add_python_module("tensorflow/core/framework")
 add_python_module("tensorflow/core/lib")
 add_python_module("tensorflow/core/lib/core")
+add_python_module("tensorflow/core/profiler")
 add_python_module("tensorflow/core/protobuf")
 add_python_module("tensorflow/core/util")
 add_python_module("tensorflow/examples")
@@ -211,6 +186,7 @@ add_python_module("tensorflow/python/debug")
 add_python_module("tensorflow/python/debug/cli")
 add_python_module("tensorflow/python/debug/examples")
 add_python_module("tensorflow/python/debug/lib")
+add_python_module("tensorflow/python/debug/ops")
 add_python_module("tensorflow/python/debug/wrappers")
 add_python_module("tensorflow/python/eager")
 add_python_module("tensorflow/python/estimator")
@@ -298,6 +274,8 @@ add_python_module("tensorflow/contrib/android/java/org/tensorflow")
 add_python_module("tensorflow/contrib/android/java/org/tensorflow/contrib")
 add_python_module("tensorflow/contrib/android/java/org/tensorflow/contrib/android")
 add_python_module("tensorflow/contrib/android/jni")
+add_python_module("tensorflow/contrib/batching")
+add_python_module("tensorflow/contrib/batching/ops")
 add_python_module("tensorflow/contrib/bayesflow")
 add_python_module("tensorflow/contrib/bayesflow/examples")
 add_python_module("tensorflow/contrib/bayesflow/examples/reinforce_simple")
@@ -639,9 +617,14 @@ add_python_module("tensorflow/contrib/reduce_slice_ops/python/kernel_tests")
 add_python_module("tensorflow/contrib/reduce_slice_ops/python/ops")
 
 # Generate the tensorflow.python.platform.build_info module.
+if (tensorflow_ENABLE_GPU)
+	set(tf_build_type "gpu")
+else()
+	set(tf_build_type "cpu")
+endif()
 set(BUILD_INFO_PY "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/platform/build_info.py")
 add_custom_command(TARGET tf_python_copy_scripts_to_destination PRE_BUILD
-  COMMAND ${PYTHON_EXECUTABLE} ${tensorflow_source_dir}/tensorflow/tools/build_info/gen_build_info.py --raw_generate ${BUILD_INFO_PY} ${tensorflow_BUILD_INFO_FLAGS})
+  COMMAND ${PYTHON_EXECUTABLE} ${tensorflow_source_dir}/tensorflow/tools/build_info/gen_build_info.py --raw_generate ${BUILD_INFO_PY} ${tensorflow_BUILD_INFO_FLAGS} --build_config ${tf_build_type})
 
 
 ########################################################
@@ -699,7 +682,7 @@ function(GENERATE_PYTHON_OP_LIB tf_python_op_lib_name)
         ${GENERATE_PYTHON_OP_LIB_ADDITIONAL_LIBRARIES}
     )
     target_link_libraries(${tf_python_op_lib_name}_gen_python PRIVATE
-        tf_protos_cc
+        tensorflow_protos
 				tf_python_protos_cc
         ${tensorflow_EXTERNAL_LIBRARIES}
     )
@@ -748,6 +731,13 @@ GENERATE_PYTHON_OP_LIB("string_ops")
 GENERATE_PYTHON_OP_LIB("user_ops")
 GENERATE_PYTHON_OP_LIB("training_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/training/gen_training_ops.py)
+
+GENERATE_PYTHON_OP_LIB("contrib_batch_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/batching/ops/gen_batch_ops.py)
+GENERATE_PYTHON_OP_LIB("contrib_tpu_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/ops/gen_tpu_ops.py)
+#GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_ensemble_optimizer_ops"
+#  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_ensemble_optimizer_ops.py)
 
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_model_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_model_ops.py)
@@ -912,13 +902,13 @@ if(WIN32)
         ${NUMPY_INCLUDE_DIR}
     )
     #target_link_libraries(pywrap_tensorflow_internal_static
-    #	tf_protos_cc
+    #	tensorflow_protos
     #	tf_python_protos_cc
     #)
-    add_dependencies(pywrap_tensorflow_internal_static tf_protos_cc tf_python_protos_cc)
+    add_dependencies(pywrap_tensorflow_internal_static tensorflow_protos tf_python_protos_cc)
     set(pywrap_tensorflow_internal_static_dependencies
         $<TARGET_FILE:pywrap_tensorflow_internal_static>
-        $<TARGET_FILE:tf_protos_cc>
+        $<TARGET_FILE:tensorflow_protos>
         $<TARGET_FILE:tf_python_protos_cc>
 	${nsync_STATIC_LIBRARIES}
     )
@@ -953,6 +943,7 @@ add_library(pywrap_tensorflow_internal SHARED
     $<TARGET_OBJECTS:tf_grappler>
     $<TARGET_OBJECTS:tf_tools_transform_graph_lib>
     $<$<BOOL:${tensorflow_ENABLE_GRPC_SUPPORT}>:$<TARGET_OBJECTS:tf_core_distributed_runtime>>
+    $<$<BOOL:${tensorflow_ENABLE_MPI}>:$<TARGET_OBJECTS:tf_core_mpi>>
     $<TARGET_OBJECTS:tf_core_kernels>
     $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_core_kernels_cpu_only>>
     $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
@@ -971,84 +962,21 @@ target_include_directories(pywrap_tensorflow_internal PUBLIC
 target_link_libraries(pywrap_tensorflow_internal PRIVATE
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
-    tf_protos_cc
+    tensorflow_protos
     tf_python_protos_cc
     ${PYTHON_LIBRARIES}
+    ${MKL_LIBRARIES}
 )
 
-if(WIN32)
-    # include contrib/nearest_neighbor as .so
-    #
-    set(tf_nearest_neighbor_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/nearest_neighbor/kernels/heap.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/nearest_neighbor/kernels/hyperplane_lsh_probes.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/nearest_neighbor/kernels/hyperplane_lsh_probes.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/nearest_neighbor/ops/nearest_neighbor_ops.cc"
-    )
 
-    AddUserOps(TARGET _nearest_neighbor_ops
-        SOURCES "${tf_nearest_neighbor_srcs}"
-        DEPENDS pywrap_tensorflow_internal tf_python_ops
-        DISTCOPY ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/nearest_neighbor/python/ops/)
-endif(WIN32)
 
-if(WIN32)
-    # include contrib/rnn as .so
-    #
-    set(tf_gru_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/blas_gemm.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/blas_gemm.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/gru_ops.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/gru_ops.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/ops/gru_ops.cc"
-    )
-    set(tf_gru_gpu_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/gru_ops_gpu.cu.cc"
-    )
 
-    set(tf_lstm_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/blas_gemm.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/blas_gemm.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/lstm_ops.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/lstm_ops.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/ops/lstm_ops.cc"
-    )
-    set(tf_lstm_gpu_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/rnn/kernels/lstm_ops_gpu.cu.cc"
-    )
 
-    AddUserOps(TARGET _gru_ops
-        SOURCES "${tf_gru_srcs}"
-        GPUSOURCES ${tf_gru_gpu_srcs}
-        DEPENDS pywrap_tensorflow_internal tf_python_ops
-        DISTCOPY ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/)
 
-    AddUserOps(TARGET _lstm_ops
-        SOURCES "${tf_lstm_srcs}"
-        GPUSOURCES ${tf_lstm_gpu_srcs}
-        DEPENDS pywrap_tensorflow_internal tf_python_ops
-        DISTCOPY ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/)
-endif(WIN32)
 
-if(WIN32)
-    # include contrib/seq2seq as .so
-    #
-    set(tf_beam_search_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/seq2seq/kernels/beam_search_ops.cc"
-        "${tensorflow_source_dir}/tensorflow/contrib/seq2seq/kernels/beam_search_ops.h"
-        "${tensorflow_source_dir}/tensorflow/contrib/seq2seq/ops/beam_search_ops.cc"
-    )
 
-    set(tf_beam_search_gpu_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/seq2seq/kernels/beam_search_ops_gpu.cu.cc"
-    )
 
-    AddUserOps(TARGET _beam_search_ops
-        SOURCES "${tf_beam_search_srcs}"
-        GPUSOURCES ${tf_beam_search_gpu_srcs}
-        DEPENDS pywrap_tensorflow_internal tf_python_ops
-        DISTCOPY ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/seq2seq/python/ops/)
-endif(WIN32)
+
 
 ############################################################
 # Build a PIP package containing the TensorFlow runtime.
@@ -1060,6 +988,14 @@ add_dependencies(tf_python_build_pip_package
     tf_python_touchup_modules
     tf_python_ops
     tf_extension_ops)
+
+if(tensorflow_BUILD_SHARED_LIB)
+    add_custom_target(tf_python_package_and_slibs)
+    add_dependencies(tf_python_package_and_slibs
+        tf_python_build_pip_package
+        tensorflow
+    )
+endif()
 
 # Fix-up Python files that were not included by the add_python_module() macros.
 add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
@@ -1081,6 +1017,9 @@ else()
   add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libpywrap_tensorflow_internal.so
                                      ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/_pywrap_tensorflow_internal.so)
+  add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/libtensor_forest_protos.so
+                                     ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/libtensor_forest_protos.so)
 endif()
 add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy ${tensorflow_source_dir}/tensorflow/tools/pip_package/README
@@ -1128,6 +1067,7 @@ add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${tensorflow_source_dir}/tensorflow/stream_executor
                                    ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/include/tensorflow/stream_executor)
 
+if(WIN32)
 # google protobuf headers
 add_custom_command(TARGET tf_python_build_pip_package PRE_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory
@@ -1176,6 +1116,7 @@ add_custom_command(TARGET tf_python_build_pip_package PRE_BUILD
 add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/unsupported/Eigen
                                    ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/include/unsupported/Eigen)
+endif(WIN32)
 
 if(${tensorflow_TF_NIGHTLY})
   if(${tensorflow_ENABLE_GPU})

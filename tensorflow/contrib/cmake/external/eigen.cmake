@@ -45,6 +45,7 @@ ExternalProject_Add(eigen
     URL ${eigen_URL}
     DOWNLOAD_DIR "${DOWNLOAD_LOCATION}"
     INSTALL_DIR "${eigen_INSTALL}"
+    PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/patches/eigen/Macros.h ${eigen_BUILD}/Eigen/src/Core/util/Macros.h
     CMAKE_CACHE_ARGS
         -DCMAKE_BUILD_TYPE:STRING=Release
         -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF

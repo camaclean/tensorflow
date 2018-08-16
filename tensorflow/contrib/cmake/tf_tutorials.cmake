@@ -30,7 +30,7 @@ add_executable(tf_tutorials_example_trainer
 )
 
 target_link_libraries(tf_tutorials_example_trainer PUBLIC
-    tf_protos_cc
+    tensorflow_protos
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
 )

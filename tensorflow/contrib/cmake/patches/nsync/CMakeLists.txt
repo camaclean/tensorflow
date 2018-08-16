@@ -269,6 +269,7 @@ foreach (t IN ITEMS "nsync" "nsync_test" ${NSYNC_TESTS})
     target_link_libraries (${t} "${CMAKE_THREAD_LIBS_INIT}")
   endif ()
 endforeach (t)
+target_link_libraries(pingpong_test /lib64/librt.so.1)
 
 foreach (t IN ITEMS ${NSYNC_TESTS})
   target_link_libraries (${t} nsync_test nsync)

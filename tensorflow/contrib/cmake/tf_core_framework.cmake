@@ -22,6 +22,7 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
     message(SEND_ERROR "Error: RELATIVE_PROTOBUF_GENERATE_CPP() called without any proto files")
     return()
   endif()
+  message("Protobuf_PROTOC_EXECUTABLE: ${Protobuf_PROTOC_EXECUTABLE}")
 
   set(${SRCS})
   set(${HDRS})
@@ -37,9 +38,10 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
     add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc"
              "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
-      COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+      #COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
+      COMMAND  ${Protobuf_PROTOC_EXECUTABLE}
       ARGS --cpp_out  ${CMAKE_CURRENT_BINARY_DIR} -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
-      DEPENDS ${ABS_FIL} protobuf
+      DEPENDS ${ABS_FIL}
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
       VERBATIM )
   endforeach()
@@ -76,7 +78,7 @@ if(NOT WIN32)
                "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
         COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
         ARGS --grpc_out ${CMAKE_CURRENT_BINARY_DIR} --cpp_out ${CMAKE_CURRENT_BINARY_DIR} --plugin protoc-gen-grpc=${GRPC_BUILD}/grpc_cpp_plugin -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
-        DEPENDS ${ABS_FIL} protobuf grpc
+        DEPENDS ${ABS_FIL}
         COMMENT "Running C++ protocol buffer grpc compiler on ${FIL}"
         VERBATIM )
     endforeach()
@@ -125,6 +127,7 @@ endfunction()
 
 file(GLOB_RECURSE tf_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
     "${tensorflow_source_dir}/tensorflow/core/*.proto"
+    "${tensorflow_source_dir}/tensorflow/core/profiler/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/proto/*.proto"
 )
 RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
@@ -173,7 +176,7 @@ RELATIVE_PROTOBUF_TEXT_GENERATE_CPP(PROTO_TEXT_SRCS PROTO_TEXT_HDRS
 )
 
 if(WIN32)
-  add_library(tf_protos_cc ${PROTO_SRCS} ${PROTO_HDRS})
+  add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})
 else()
   file(GLOB_RECURSE tf_protos_grpc_cc_srcs RELATIVE ${tensorflow_source_dir}
       "${tensorflow_source_dir}/tensorflow/core/debug/*.proto"
@@ -181,8 +184,13 @@ else()
   RELATIVE_PROTOBUF_GENERATE_GRPC_CPP(PROTO_GRPC_SRCS PROTO_GRPC_HDRS
       ${tensorflow_source_dir} ${tf_protos_grpc_cc_srcs}
   )
-  add_library(tf_protos_cc ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_SRCS} ${PROTO_HDRS})
+  add_library(tensorflow_protos SHARED ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_SRCS} ${PROTO_HDRS})
+  target_link_libraries(tensorflow_protos gRPC::grpc_unsecure gRPC::grpc++_unsecure)
 endif()
+set_target_properties(tensorflow_protos PROPERTIES
+    VERSION ${TENSORFLOW_LIB_VERSION}
+    SOVERSION ${TENSORFLOW_LIB_SOVERSION}
+)
 
 ########################################################
 # tf_core_lib library
@@ -262,7 +270,7 @@ file(GLOB_RECURSE tf_core_lib_test_srcs
 list(REMOVE_ITEM tf_core_lib_srcs ${tf_core_lib_test_srcs})
 
 add_library(tf_core_lib OBJECT ${tf_core_lib_srcs})
-add_dependencies(tf_core_lib ${tensorflow_EXTERNAL_DEPENDENCIES} tf_protos_cc)
+add_dependencies(tf_core_lib ${tensorflow_EXTERNAL_DEPENDENCIES} tensorflow_protos)
 
 # Tricky setup to force always rebuilding
 # force_rebuild always runs forcing ${VERSION_INFO_CC} target to run
@@ -270,12 +278,10 @@ add_dependencies(tf_core_lib ${tensorflow_EXTERNAL_DEPENDENCIES} tf_protos_cc)
 # target.
 set(VERSION_INFO_CC ${tensorflow_source_dir}/tensorflow/core/util/version_info.cc)
 add_custom_target(force_rebuild_target ALL DEPENDS ${VERSION_INFO_CC})
-add_custom_command(OUTPUT __force_rebuild COMMAND ${CMAKE_COMMAND} -E echo)
 add_custom_command(OUTPUT
     ${VERSION_INFO_CC}
     COMMAND ${PYTHON_EXECUTABLE} ${tensorflow_source_dir}/tensorflow/tools/git/gen_git_source.py
-    --raw_generate ${VERSION_INFO_CC}
-    DEPENDS __force_rebuild)
+    --raw_generate ${VERSION_INFO_CC})
 set(tf_version_srcs ${tensorflow_source_dir}/tensorflow/core/util/version_info.cc)
 
 ########################################################

@@ -16,9 +16,23 @@ get_filename_component(tensorflow_source_dir ${tf_tf_source_dir} PATH)
 # CMake policies
 cmake_policy(SET CMP0022 NEW)
 
+get_property(LIB64 GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS)
+
+if ("${LIB64}" STREQUAL "TRUE")
+    set(LIBSUFFIX 64)
+else()
+    set(LIBSUFFIX "")
+endif()
+
+set(TENSORFLOW_LIB_VERSION 1.4.1)
+set(TENSORFLOW_LIB_SOVERSION 1)
+
 # Options
 option(tensorflow_VERBOSE "Enable for verbose output" OFF)
 option(tensorflow_ENABLE_GPU "Enable GPU support" OFF)
+option(tensorflow_CUDA_30 "Build for CUDA 3.0 compute capability" ON)
+option(tensorflow_CUDA_35 "Build for CUDA 3.5 compute capability" ON)
+option(tensorflow_CUDA_52 "Build for CUDA 5.2 compute capability" ON)
 option(tensorflow_ENABLE_SSL_SUPPORT "Enable boringssl support" OFF)
 option(tensorflow_ENABLE_GRPC_SUPPORT "Enable gRPC support" ON)
 option(tensorflow_ENABLE_HDFS_SUPPORT "Enable HDFS support" OFF)
@@ -34,6 +48,26 @@ option(tensorflow_BUILD_SHARED_LIB "Build TensorFlow as a shared library" OFF)
 option(tensorflow_OPTIMIZE_FOR_NATIVE_ARCH "Enable compiler optimizations for the native processor architecture (if available)" ON)
 option(tensorflow_WIN_CPU_SIMD_OPTIONS "Enables CPU SIMD instructions")
 option(tensorflow_ENABLE_SNAPPY_SUPPORT "Enable SNAPPY compression support" ON)
+option(tensorflow_ENABLE_MPI "Enable MPI support" OFF)
+option(tensorflow_USE_MKL OFF)
+option(LIBTENSORFLOW_MODULE ON)
+
+if (LIBTENSORFLOW_MODULE)
+    set(tensorflow_BUILD_PYTHON_BINDINGS OFF)
+    set(tensorflow_BUILD_SHARED_LIB "Build TensorFlow as a shared library" ON)
+endif()
+
+if(tensorflow_USE_MKL)
+    add_definitions(-DINTEL_MKL=1 -fopenmp)
+    include_directories("${MKL_INCLUDE_DIR}")
+endif()
+
+if(UNIX)
+    set(CMAKE_EXE_LINKER_FLAGS "$ENV{LDFLAGS}")
+    set(CMAKE_SHARED_LINKER_FLAGS "$ENV{LDFLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
 
 if (NOT WIN32)
   # Threads: defines CMAKE_THREAD_LIBS_INIT and adds -pthread compile option
@@ -111,79 +145,77 @@ if (tensorflow_ENABLE_JEMALLOC_SUPPORT)
 endif()
 
 # External dependencies
-include(zlib)
-include(gif)
-include(png)
-include(jpeg)
-include(lmdb)
-include(eigen)
+include(FindPkgConfig)
+find_package(ZLIB REQUIRED)
+find_package(GIF REQUIRED)
+find_package(PNG REQUIRED)
+find_package(JPEG REQUIRED)
+find_package(LMDB REQUIRED)
+find_package(Eigen3Tensorflow REQUIRED CONFIG)
+#find_package(jsoncpp)
 include(gemmlowp)
 include(jsoncpp)
 include(farmhash)
 include(fft2d)
-include(highwayhash)
-include(nsync)
-include(protobuf)
-include(re2)
+find_package(highwayhash REQUIRED)
+find_package(nsync REQUIRED)
+set(protobuf_MODULE_COMPATIBLE ON)
+find_package(protobuf REQUIRED)
+#include(re2)
+pkg_check_modules(RE2 REQUIRED re2)
 include(cub)
-include(sqlite)
+include(sqlite) #done
 if (tensorflow_BUILD_CC_TESTS)
   include(googletest)
 endif()
 
 set(tensorflow_EXTERNAL_LIBRARIES
-    ${zlib_STATIC_LIBRARIES}
-    ${gif_STATIC_LIBRARIES}
-    ${png_STATIC_LIBRARIES}
-    ${jpeg_STATIC_LIBRARIES}
-    ${lmdb_STATIC_LIBRARIES}
+    ZLIB::ZLIB
+    ${GIF_LIBRARIES}
+    PNG::PNG
+    ${JPEG_LIBRARIES}
+    LMDB::LMDB
+    Eigen3::Eigen
+    nsync
+    highwayhash
     ${jsoncpp_STATIC_LIBRARIES}
+    #jsoncpp_lib
     ${farmhash_STATIC_LIBRARIES}
     ${fft2d_STATIC_LIBRARIES}
-    ${highwayhash_STATIC_LIBRARIES}
     ${nsync_STATIC_LIBRARIES}
-    ${protobuf_STATIC_LIBRARIES}
-    ${re2_STATIC_LIBRARIES}
+    protobuf::libprotobuf
+    ${RE2_LIBRARIES}
     ${sqlite_STATIC_LIBRARIES}
+    ${MKL_LIBRARIES}
 )
 set(tensorflow_EXTERNAL_DEPENDENCIES
-    zlib_copy_headers_to_destination
-    gif_copy_headers_to_destination
-    png_copy_headers_to_destination
-    jpeg_copy_headers_to_destination
-    lmdb_copy_headers_to_destination
-    jsoncpp
     farmhash_copy_headers_to_destination
-    highwayhash_copy_headers_to_destination
-    nsync_copy_headers_to_destination
-    protobuf
-    eigen
     gemmlowp
     cub
     fft2d
-    re2
-    sqlite_copy_headers_to_destination
 )
+#get_target_property(JSONCPP_INCLUDE_DIR jsoncpp_lib
+#  INTERFACE_INCLUDE_DIRECTORIES
+#)
 
 include_directories(
     # Source and generated code.
     ${tensorflow_source_dir}
     ${CMAKE_CURRENT_BINARY_DIR}
     # External dependencies.
-    ${zlib_INCLUDE_DIR}
-    ${gif_INCLUDE_DIR}
-    ${png_INCLUDE_DIR}
-    ${jpeg_INCLUDE_DIR}
-    ${lmdb_INCLUDE_DIR}
-    ${eigen_INCLUDE_DIRS}
+    #${ZLIB_INCLUDE_DIRS}
+    ${GIF_INCLUDE_DIR}
+    ${JPEG_INCLUDE_DIR}
+    ${EIGEN3_INCLUDE_DIRS}
     ${gemmlowp_INCLUDE_DIR}
-    ${jsoncpp_INCLUDE_DIR}
+    "${jsoncpp_INCLUDE_DIR}/include"
     ${farmhash_INCLUDE_DIR}
-    ${highwayhash_INCLUDE_DIR}
+    ${HIGHWAYHASH_INCLUDE_DIR}
     ${cub_INCLUDE_DIR}
-    ${nsync_INCLUDE_DIR}
-    ${PROTOBUF_INCLUDE_DIRS}
-    ${re2_INCLUDE_DIR}
+    ${NSYNC_INCLUDE_DIR}
+    #${PROTOBUF_INCLUDE_DIRS}
+    #${re2_INCLUDE_DIR}
+    ${RE2_INCLUDE_DIRS}
     ${sqlite_INCLUDE_DIR}
 )
 
@@ -196,8 +228,6 @@ endif()
 if(tensorflow_ENABLE_GRPC_SUPPORT)
   include(grpc)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES ${grpc_STATIC_LIBRARIES})
-  list(APPEND tensorflow_EXTERNAL_DEPENDENCIES grpc)
-  include_directories(${GRPC_INCLUDE_DIRS})
 endif()
 if(tensorflow_ENABLE_JEMALLOC_SUPPORT)
   include(jemalloc)
@@ -206,10 +236,8 @@ if(tensorflow_ENABLE_JEMALLOC_SUPPORT)
   include_directories(${jemalloc_INCLUDE_DIRS})
 endif()
 if(tensorflow_ENABLE_SNAPPY_SUPPORT)
-  include(snappy)
-  list(APPEND tensorflow_EXTERNAL_LIBRARIES ${snappy_STATIC_LIBRARIES})
-  list(APPEND tensorflow_EXTERNAL_DEPENDENCIES snappy)
-  include_directories(${snappy_INCLUDE_DIR})
+  find_package(Snappy REQUIRED)
+  list(APPEND tensorflow_EXTERNAL_LIBRARIES Snappy::snappy)
 endif()
 if(WIN32)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES wsock32 ws2_32 shlwapi)
@@ -218,19 +246,100 @@ if(UNIX)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 endif()
 
+function(JOIN VALUES GLUE OUTPUT)
+  string (REGEX REPLACE "([^\\]|^);" "\\1${GLUE}" _TMP_STR "${VALUES}")
+  string (REGEX REPLACE "[\\](.)" "\\1" _TMP_STR "${_TMP_STR}") #fixes escaping
+  set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
+endfunction()
+
+if(NOT (tensorflow_CUDA_30 OR tensorflow_CUDA_35 OR tensorflow_CUDA_52))
+    set(tensorflow_ENABLE_GPU FALSE)
+endif()
+
 if (tensorflow_ENABLE_GPU)
+  find_package(CUDA 7.5 REQUIRED)
+  set(CUDA_TOOLKIT_TARGET_DIR "${CUDA_TOOLKIT_ROOT_DIR}" CACHE STRING "")
+
+  # by default we assume compute cabability 3.5 and 5.2. If you change this change it in
+  # CUDA_NVCC_FLAGS and cuda_config.h below
+  set(TF_EXTRA_CUDA_CAPABILITIES_30 "3.0")
+  set(TF_EXTRA_CUDA_CAPABILITIES_35 "3.5")
+  set(TF_EXTRA_CUDA_CAPABILITIES_52 "5.2")
+  set(CUDA_NVCC_FLAGS_30 "-gencode arch=compute_30,code=\"sm_30,compute_30\"")
+  set(CUDA_NVCC_FLAGS_35 "-gencode arch=compute_35,code=\"sm_35,compute_35\"")
+  set(CUDA_NVCC_FLAGS_52 "-gencode arch=compute_52,code=\"sm_30,compute_52\"")
+  set(TF_CUDA_CAPABILITIES_30 "CudaVersion(\"3.0\")")
+  set(TF_CUDA_CAPABILITIES_35 "CudaVersion(\"3.5\")")
+  set(TF_CUDA_CAPABILITIES_52 "CudaVersion(\"5.2\")")
+  if(tensorflow_CUDA_30)
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_30})
+    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_30})
+    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_30})
+  endif()
+  if(tensorflow_CUDA_35)
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_35})
+    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_35})
+    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_35})
+  endif()
+  if(tensorflow_CUDA_52)
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_52})
+    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_52})
+    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_52})
+  endif()
+  join("${TF_CUDA_CAPABILITIES_LIST}" "," TF_CUDA_CAPABILITIES)
+  join("${TF_EXTRA_CUDA_CAPABILITIES_LIST}" "," TF_EXTRA_CUDA_CAPABILITIES)
+  
+  if(${CUDA_VERSION} STREQUAL "7.5")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_75")
+    else()
+      set(TF_CUDA_VERSION "7.5")
+    endif()
+  elseif(${CUDA_VERSION} STREQUAL "8.0")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_80")
+    else()
+      set(TF_CUDA_VERSION "8.0")
+    endif()
+  elseif(${CUDA_VERSION} STREQUAL "9.0")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_90")
+    else()
+      set(TF_CUDA_VERSION "9.0")
+    endif()
+  elseif(${CUDA_VERSION} STREQUAL "9.1")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_91")
+    else()
+      set(TF_CUDA_VERSION "9.1")
+    endif()
+  elseif(${CUDA_VERSION} STREQUAL "9.2")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_92")
+    else()
+      set(TF_CUDA_VERSION "9.2")
+    endif()
+  endif()
+  if(NOT CUDNN_VERSION)
+    set(CUDNN_VERSION "5")
+  endif(NOT CUDNN_VERSION)
+  if(WIN32)
+    set(TF_CUDNN_VERSION "64_${CUDNN_VERSION}")
+  else()
+    set(TF_CUDNN_VERSION "${CUDNN_VERSION}")
+  endif()
+
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--include-path ${PROJECT_BINARY_DIR}/$\{build_configuration\};--expt-relaxed-constexpr)
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
+  if(UNIX)
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--rpath=${CUDA_TOOLKIT_TARGET_DIR}/lib64 -Wl,--rpath=${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/lib64")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--rpath=${CUDA_TOOLKIT_TARGET_DIR}/lib64 -Wl,--rpath=${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/lib64")
+    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-Xcompiler;-fPIC)
+  endif(UNIX)
+  set(CUDA_INCLUDE ${CUDA_TOOLKIT_TARGET_DIR}/include ${CUDA_TOOLKIT_TARGET_DIR}/include/crt ${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/include)
+  include_directories(${CUDA_INCLUDE})
+  add_definitions(-DGOOGLE_CUDA=1 -DTF_EXTRA_CUDA_CAPABILITIES=${TF_EXTRA_CUDA_CAPABILITIES})
   if (WIN32)
-    find_package(CUDA 8.0 REQUIRED)
-
-    # by default we assume compute cabability 3.5 and 5.2. If you change this change it in
-    # CUDA_NVCC_FLAGS and cuda_config.h below
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_30,code=\"sm_30,compute_30\";-gencode arch=compute_35,code=\"sm_35,compute_35\";-gencode arch=compute_52,code=\"sm_52,compute_52\")
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};--include-path ${PROJECT_BINARY_DIR}/$\{build_configuration\};--expt-relaxed-constexpr)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-ftz=true)  # Flush denormals to zero
-    set(CUDA_INCLUDE ${CUDA_TOOLKIT_TARGET_DIR} ${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/include)
-    include_directories(${CUDA_INCLUDE})
-    add_definitions(-DGOOGLE_CUDA=1 -DTF_EXTRA_CUDA_CAPABILITIES=3.0,3.5,5.2)
-
     # add cudnn
     if(NOT CUDNN_HOME)
       set(CUDNN_HOME ${CUDA_TOOLKIT_TARGET_DIR})
@@ -238,48 +347,35 @@ if (tensorflow_ENABLE_GPU)
     include_directories(${CUDNN_HOME})
     set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_CUFFT_LIBRARIES}
       ${CUDA_curand_LIBRARY} ${CUDA_cupti_LIBRARY} ${CUDA_cusolver_LIBRARY} ${CUDNN_HOME}/lib/x64/cudnn.lib)
+  elseif(UNIX)
+    set(CUDA_LIBRARIES ${CUDA_LIBRARIES} ${CUDA_CUDA_LIBRARY} ${CUDA_CUBLAS_LIBRARIES} ${CUDA_CUFFT_LIBRARIES}
+      ${CUDA_curand_LIBRARY} ${CUDA_cupti_LIBRARY} ${CUDA_cusolver_LIBRARY} ${CUDNN_HOME}/lib/libcudnn.so)
+  endif()
 
-    # create cuda_config.h
-    FILE(WRITE ${tensorflow_source_dir}/third_party/gpus/cuda/cuda_config.h
-      "#ifndef CUDA_CUDA_CONFIG_H_\n"
-      "#define CUDA_CUDA_CONFIG_H_\n"
-      "#define TF_CUDA_CAPABILITIES CudaVersion(\"3.0\"),CudaVersion(\"3.5\"),CudaVersion(\"5.2\")\n"
-      "#define TF_CUDA_VERSION \"64_80\"\n"
-      "#define TF_CUDNN_VERSION \"64_6\"\n"
-      "#define TF_CUDA_TOOLKIT_PATH \"${CUDA_TOOLKIT_ROOT_DIR}\"\n"
-      "#endif  // CUDA_CUDA_CONFIG_H_\n"
-    )
+  # create cuda_config.h
+  configure_file(cuda_config.h.in ${tensorflow_source_dir}/third_party/gpus/cuda/cuda_config.h)
+  install(FILES ${tensorflow_source_dir}/third_party/gpus/cuda/cuda_config.h DESTINATION "include/tensorflow/cuda")
 
-    # tf assumes in various places header files to be in cuda/include. On windows the cuda sdk
-    # installs them under cuda/version/include and to avoid that we need to change tf we copy a
-    # few files to cuda/include
-    FILE(COPY
-      ${CUDA_TOOLKIT_TARGET_DIR}/include/cuda.h ${CUDA_TOOLKIT_TARGET_DIR}/include/cuComplex.h
-      ${CUDA_TOOLKIT_TARGET_DIR}/include/cublas_v2.h ${CUDNN_HOME}/include/cudnn.h
-      ${CUDA_TOOLKIT_TARGET_DIR}/include/cufft.h ${CUDA_TOOLKIT_TARGET_DIR}/include/curand.h
-      ${CUDA_TOOLKIT_TARGET_DIR}/include/cuda_runtime_api.h
-      ${CUDA_TOOLKIT_TARGET_DIR}/include/cusolverDn.h
-      DESTINATION ${tensorflow_source_dir}/third_party/gpus/cuda/include
-    )
-    include_directories(${tensorflow_source_dir}/third_party/gpus)
-    # add cuda libraries to tensorflow_EXTERNAL_LIBRARIES
-    list(APPEND tensorflow_EXTERNAL_LIBRARIES ${CUDA_LIBRARIES})
+  if(UNIX)
+   execute_process(COMMAND ln -snf "${CUDA_TOOLKIT_TARGET_DIR}/extras" "${tensorflow_source_dir}/third_party/gpus/cuda/")
+  endif(UNIX)
 
-    # NOTE(mrry): Update these flags when the version of CUDA or cuDNN used
-    # in the default build is upgraded.
-    set(tensorflow_BUILD_INFO_FLAGS --build_config cuda --key_value
-      msvcp_dll_name=msvcp140.dll
-      cudart_dll_name=cudart64_80.dll
-      cuda_version_number=8.0
-      nvcuda_dll_name=nvcuda.dll
-      cudnn_dll_name=cudnn64_6.dll
-      cudnn_version_number=6)
-  else(WIN32)
-    message(FATAL_ERROR "CMake GPU build is currently only supported on Windows.")
-  endif(WIN32)
-else(tensorflow_ENABLE_GPU)
-  set(tensorflow_BUILD_INFO_FLAGS --build_config cpu --key_value
-    msvcp_dll_name=msvcp140.dll)
+  # tf assumes in various places header files to be in cuda/include. On windows the cuda sdk
+  # installs them under cuda/version/include and to avoid that we need to change tf we copy a
+  # few files to cuda/include
+  FILE(COPY
+    ${CUDA_TOOLKIT_TARGET_DIR}/include/cuda.h ${CUDA_TOOLKIT_TARGET_DIR}/include/cuComplex.h
+    ${CUDA_TOOLKIT_TARGET_DIR}/include/cublas_v2.h ${CUDNN_HOME}/include/cudnn.h
+    ${CUDA_TOOLKIT_TARGET_DIR}/include/cufft.h ${CUDA_TOOLKIT_TARGET_DIR}/include/curand.h
+    ${CUDA_TOOLKIT_TARGET_DIR}/include/cuda_runtime_api.h
+    ${CUDA_TOOLKIT_TARGET_DIR}/include/cusolverDn.h
+    DESTINATION ${tensorflow_source_dir}/third_party/gpus/cuda/include
+  )
+  include_directories(${tensorflow_source_dir}/third_party/gpus)
+  FILE(COPY
+    ${NCCL_INCLUDES}
+    DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/external/nccl_archive/src/
+  )
 endif(tensorflow_ENABLE_GPU)
 
 # Find python executable
@@ -293,9 +389,7 @@ include(tf_core_framework.cmake)
 # NOTE: Disabled until issue #3996 is fixed.
 # include(tf_stream_executor.cmake)
 if (tensorflow_ENABLE_GPU)
-  if (WIN32)
-    include(tf_stream_executor.cmake)
-  endif()
+  include(tf_stream_executor.cmake)
 endif()
 
 include(tf_core_cpu.cmake)
@@ -305,22 +399,39 @@ include(tf_core_kernels.cmake)
 if(tensorflow_ENABLE_GRPC_SUPPORT)
   include(tf_core_distributed_runtime.cmake)
 endif()
+if(tensorflow_ENABLE_MPI)
+  include(tf_core_mpi.cmake)
+endif()
 # We include tf_cc_ops first, because tf_c depends on tf_cc.
 include(tf_cc_ops.cmake)
 include(tf_c.cmake)
-include(tf_grappler.cmake)
 include(tf_core_profiler.cmake)
 if(tensorflow_BUILD_CC_EXAMPLE)
   include(tf_tutorials.cmake)
   include(tf_label_image_example.cmake)
 endif()
 include(tf_tools.cmake)
+include(tf_grappler.cmake)
 if(tensorflow_BUILD_PYTHON_BINDINGS)
   include(tf_python.cmake)
 endif()
-if(tensorflow_BUILD_SHARED_LIB)
-  include(tf_shared_lib.cmake)
-endif()
+include(tf_shared_lib.cmake)
 if(tensorflow_BUILD_CC_TESTS OR tensorflow_BUILD_PYTHON_TESTS)
   include(tf_tests.cmake)
 endif()
+
+EXPORT(PACKAGE Tensorflow)
+SET(TENSORFLOW_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include/tensorflow")
+CONFIGURE_FILE(TensorflowConfig.cmake.in "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake")
+INSTALL(FILES "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake" DESTINATION "share/tensorflow/cmake")
+
+MESSAGE(STATUS "<<< Gentoo configuration >>>
+Build type      ${CMAKE_BUILD_TYPE}
+Install path    ${CMAKE_INSTALL_PREFIX}
+Compiler flags:
+C               ${CMAKE_C_FLAGS}
+C++             ${CMAKE_CXX_FLAGS}
+Linker flags:
+Executable      ${CMAKE_EXE_LINKER_FLAGS}
+Module          ${CMAKE_MODULE_LINKER_FLAGS}
+Shared          ${CMAKE_SHARED_LINKER_FLAGS}\n")

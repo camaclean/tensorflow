@@ -496,7 +496,7 @@ if (tensorflow_BUILD_CC_TESTS)
   )
 
   set(tf_test_libs
-    tf_protos_cc
+    tensorflow_protos
     tf_test_lib
     ${tf_core_gpu_kernels_lib}
     ${googletest_STATIC_LIBRARIES}
