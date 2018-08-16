@@ -20,16 +20,6 @@ py_library(
     srcs_version = "PY2AND3",
     deps = [
         "//tensorflow/python:training",
+        "//tensorflow/python:util",
     ],
-)
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
 )

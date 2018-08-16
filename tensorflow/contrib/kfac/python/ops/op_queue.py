@@ -18,7 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.contrib.data.python.ops import dataset_ops
+from tensorflow.python.data.ops import dataset_ops
 from tensorflow.python.framework import ops as tf_ops
 
 
@@ -61,7 +61,7 @@ class OpQueue(object):
       sess: tf.Session.
 
     Returns:
-      Next Op chosen from from 'ops'.
+      Next Op chosen from 'ops'.
     """
     # In Python 3, type(next_op_name) == bytes. Calling bytes.decode('ascii')
     # returns a str.

@@ -40,8 +40,8 @@ Status GetWindowedOutputSizeVerboseV2(int64 input_size, int64 filter_size,
     case Padding::SAME:
       *output_size = (input_size + stride - 1) / stride;
       const int64 padding_needed =
-          std::max(0LL, (*output_size - 1) * stride + effective_filter_size -
-                            input_size);
+          std::max(int64{0}, (*output_size - 1) * stride +
+                                 effective_filter_size - input_size);
       // For odd values of total padding, add more padding at the 'right'
       // side of the given dimension.
       *padding_before = padding_needed / 2;
@@ -49,7 +49,11 @@ Status GetWindowedOutputSizeVerboseV2(int64 input_size, int64 filter_size,
       break;
   }
   if (*output_size < 0) {
-    return errors::InvalidArgument("computed output size would be negative");
+    return errors::InvalidArgument(
+        "Computed output size would be negative: ", *output_size,
+        " [input_size: ", input_size,
+        ", effective_filter_size: ", effective_filter_size,
+        ", stride: ", stride, "]");
   }
   return Status::OK();
 }
@@ -299,6 +303,9 @@ Status MakeShapeFromFormat(TensorFormat format, DimensionOrConstant N,
   if (format == FORMAT_NCHW_VECT_C) {
     dims_actual[GetTensorInnerFeatureDimIndex(num_dims, format)] =
         context->MakeDim(4);
+  } else if (format == FORMAT_NHWC_VECT_W) {
+    dims_actual[GetTensorInnerWidthDimIndex(num_dims, format)] =
+        context->MakeDim(4);
   }
   for (int spatial_dim = 0; spatial_dim < spatial.size(); spatial_dim++) {
     dims_actual[GetTensorSpatialDimIndex(num_dims, format, spatial_dim)] =
@@ -397,6 +404,15 @@ Status Conv2DShape(shape_inference::InferenceContext* c) {
   TF_RETURN_IF_ERROR(
       CheckFormatConstraintsOnShape(data_format, filter_shape, "filter", c));
 
+  std::vector<int32> dilations;
+  TF_RETURN_IF_ERROR(c->GetAttr("dilations", &dilations));
+
+  if (dilations.size() != 4) {
+    return errors::InvalidArgument(
+        "Conv2D requires the dilation attribute to contain 4 values, but got: ",
+        dilations.size());
+  }
+
   std::vector<int32> strides;
   TF_RETURN_IF_ERROR(c->GetAttr("strides", &strides));
 
@@ -410,6 +426,8 @@ Status Conv2DShape(shape_inference::InferenceContext* c) {
 
   const int32 stride_rows = GetTensorDim(strides, data_format, 'H');
   const int32 stride_cols = GetTensorDim(strides, data_format, 'W');
+  const int32 dilation_rows = GetTensorDim(dilations, data_format, 'H');
+  const int32 dilation_cols = GetTensorDim(dilations, data_format, 'W');
 
   DimensionHandle batch_size_dim;
   DimensionHandle input_depth_dim;
@@ -447,12 +465,12 @@ Status Conv2DShape(shape_inference::InferenceContext* c) {
   TF_RETURN_IF_ERROR(c->GetAttr("padding", &padding));
 
   DimensionHandle output_rows, output_cols;
-  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDims(c, input_spatial_dims[0],
-                                                   filter_rows_dim, stride_rows,
-                                                   padding, &output_rows));
-  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDims(c, input_spatial_dims[1],
-                                                   filter_cols_dim, stride_cols,
-                                                   padding, &output_cols));
+  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDimsV2(
+      c, input_spatial_dims[0], filter_rows_dim, dilation_rows, stride_rows,
+      padding, &output_rows));
+  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDimsV2(
+      c, input_spatial_dims[1], filter_cols_dim, dilation_cols, stride_cols,
+      padding, &output_cols));
 
   ShapeHandle output_shape;
   TF_RETURN_IF_ERROR(
@@ -472,6 +490,15 @@ Status Conv3DShape(shape_inference::InferenceContext* c) {
   string data_format;
   Status s = c->GetAttr("data_format", &data_format);
 
+  std::vector<int32> dilations;
+  TF_RETURN_IF_ERROR(c->GetAttr("dilations", &dilations));
+
+  if (dilations.size() != 5) {
+    return errors::InvalidArgument(
+        "Conv3D requires the dilation attribute to contain 5 values, but got: ",
+        dilations.size());
+  }
+
   std::vector<int32> strides;
   TF_RETURN_IF_ERROR(c->GetAttr("strides", &strides));
   if (strides.size() != 5) {
@@ -481,6 +508,7 @@ Status Conv3DShape(shape_inference::InferenceContext* c) {
   }
 
   int32 stride_planes, stride_rows, stride_cols;
+  int32 dilation_planes, dilation_rows, dilation_cols;
   if (s.ok() && data_format == "NCDHW") {
     // Convert input_shape to NDHWC.
     auto dim = [&](char dimension) {
@@ -489,12 +517,18 @@ Status Conv3DShape(shape_inference::InferenceContext* c) {
     input_shape =
         c->MakeShape({{dim('N'), dim('0'), dim('1'), dim('2'), dim('C')}});
     stride_planes = strides[2];
-    stride_cols = strides[3];
-    stride_rows = strides[4];
+    stride_rows = strides[3];
+    stride_cols = strides[4];
+    dilation_planes = dilations[2];
+    dilation_cols = dilations[3];
+    dilation_rows = dilations[4];
   } else {
     stride_planes = strides[1];
     stride_rows = strides[2];
     stride_cols = strides[3];
+    dilation_planes = dilations[1];
+    dilation_cols = dilations[2];
+    dilation_rows = dilations[3];
   }
 
   DimensionHandle batch_size_dim = c->Dim(input_shape, 0);
@@ -515,13 +549,15 @@ Status Conv3DShape(shape_inference::InferenceContext* c) {
   TF_RETURN_IF_ERROR(c->GetAttr("padding", &padding));
   DimensionHandle output_planes, output_rows, output_cols;
 
-  TF_RETURN_IF_ERROR(
-      GetWindowedOutputSizeFromDims(c, in_planes_dim, filter_planes_dim,
-                                    stride_planes, padding, &output_planes));
-  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDims(
-      c, in_rows_dim, filter_rows_dim, stride_rows, padding, &output_rows));
-  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDims(
-      c, in_cols_dim, filter_cols_dim, stride_cols, padding, &output_cols));
+  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDimsV2(
+      c, in_planes_dim, filter_planes_dim, dilation_planes, stride_planes,
+      padding, &output_planes));
+  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDimsV2(
+      c, in_rows_dim, filter_rows_dim, dilation_rows, stride_rows, padding,
+      &output_rows));
+  TF_RETURN_IF_ERROR(GetWindowedOutputSizeFromDimsV2(
+      c, in_cols_dim, filter_cols_dim, dilation_cols, stride_cols, padding,
+      &output_cols));
 
   ShapeHandle output_shape;
   if (data_format == "NCDHW") {
@@ -685,10 +721,15 @@ Status FusedBatchNormShape(shape_inference::InferenceContext* c) {
   bool is_training;
   TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
   int number_inputs = (is_training) ? 3 : 5;
-  string data_format;
-  TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format));
-  DimensionHandle channel_dim =
-      (data_format == "NHWC") ? c->Dim(x, 3) : c->Dim(x, 1);
+  string data_format_str;
+  TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format_str));
+  TensorFormat data_format;
+  if (!FormatFromString(data_format_str, &data_format)) {
+    return errors::InvalidArgument("Invalid data format string: ",
+                                   data_format_str);
+  }
+  int channel_dim_index = GetTensorFeatureDimIndex(4, data_format);
+  DimensionHandle channel_dim = c->Dim(x, channel_dim_index);
 
   // covers scale, offset, and if is_training is false, mean, variance
   for (int i = 1; i < number_inputs; ++i) {
@@ -698,11 +739,7 @@ Status FusedBatchNormShape(shape_inference::InferenceContext* c) {
   }
 
   ShapeHandle y;
-  if (data_format == "NHWC") {
-    TF_RETURN_IF_ERROR(c->ReplaceDim(x, 3, channel_dim, &y));
-  } else {
-    TF_RETURN_IF_ERROR(c->ReplaceDim(x, 1, channel_dim, &y));
-  }
+  TF_RETURN_IF_ERROR(c->ReplaceDim(x, channel_dim_index, channel_dim, &y));
   c->set_output(0, y);
   ShapeHandle vector_shape = c->Vector(channel_dim);
   c->set_output(1, vector_shape);
@@ -719,16 +756,18 @@ Status FusedBatchNormGradShape(shape_inference::InferenceContext* c) {
   TF_RETURN_IF_ERROR(c->WithRank(c->input(1), 4, &x));
 
   bool is_training;
-  string data_format;
   TF_RETURN_IF_ERROR(c->GetAttr("is_training", &is_training));
-  TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format));
-  DimensionHandle channel_dim =
-      (data_format == "NHWC") ? c->Dim(y_backprop, 3) : c->Dim(y_backprop, 1);
-  if (data_format == "NHWC") {
-    TF_RETURN_IF_ERROR(c->Merge(channel_dim, c->Dim(x, 3), &channel_dim));
-  } else {
-    TF_RETURN_IF_ERROR(c->Merge(channel_dim, c->Dim(x, 1), &channel_dim));
+  string data_format_str;
+  TF_RETURN_IF_ERROR(c->GetAttr("data_format", &data_format_str));
+  TensorFormat data_format;
+  if (!FormatFromString(data_format_str, &data_format)) {
+    return errors::InvalidArgument("Invalid data format string: ",
+                                   data_format_str);
   }
+  int channel_dim_index = GetTensorFeatureDimIndex(4, data_format);
+  DimensionHandle channel_dim = c->Dim(y_backprop, channel_dim_index);
+  TF_RETURN_IF_ERROR(
+      c->Merge(channel_dim, c->Dim(x, channel_dim_index), &channel_dim));
 
   // covers scale, mean (reserve_space_1), variance (reserve_space_2)
   for (int i = 2; i < 5; ++i) {
@@ -738,11 +777,8 @@ Status FusedBatchNormGradShape(shape_inference::InferenceContext* c) {
   }
 
   ShapeHandle x_backprop;
-  if (data_format == "NHWC") {
-    TF_RETURN_IF_ERROR(c->ReplaceDim(y_backprop, 3, channel_dim, &x_backprop));
-  } else {
-    TF_RETURN_IF_ERROR(c->ReplaceDim(y_backprop, 1, channel_dim, &x_backprop));
-  }
+  TF_RETURN_IF_ERROR(
+      c->ReplaceDim(y_backprop, channel_dim_index, channel_dim, &x_backprop));
   c->set_output(0, x_backprop);
   c->set_output(1, c->Vector(channel_dim));
   c->set_output(2, c->Vector(channel_dim));
@@ -1020,6 +1056,29 @@ Status UnknownShape(shape_inference::InferenceContext* c) {
   return Status::OK();
 }
 
+template <typename T>
+Status ReductionShapeHelper(const Tensor* reduction_indices_t,
+                            const int32 input_rank,
+                            std::set<int64>& true_indices) {
+  auto reduction_indices = reduction_indices_t->flat<T>();
+  for (int i = 0; i < reduction_indices_t->NumElements(); ++i) {
+    const T reduction_index = reduction_indices(i);
+    if (reduction_index < -input_rank || reduction_index >= input_rank) {
+      return errors::InvalidArgument("Invalid reduction dimension ",
+                                     reduction_index, " for input with ",
+                                     input_rank, " dimensions.");
+    }
+
+    auto wrapped_index = reduction_index;
+    if (wrapped_index < 0) {
+      wrapped_index += input_rank;
+    }
+
+    true_indices.insert(wrapped_index);
+  }
+  return Status::OK();
+}
+
 Status ReductionShape(InferenceContext* c) {
   ShapeHandle input = c->input(0);
 
@@ -1050,22 +1109,16 @@ Status ReductionShape(InferenceContext* c) {
   }
 
   const int32 input_rank = c->Rank(input);
-  std::set<int32> true_indices;
-  auto reduction_indices = reduction_indices_t->flat<int32>();
-  for (int i = 0; i < reduction_indices_t->NumElements(); ++i) {
-    int32 reduction_index = reduction_indices(i);
-    if (reduction_index < -input_rank || reduction_index >= input_rank) {
-      return errors::InvalidArgument("Invalid reduction dimension ",
-                                     reduction_index, " for input with ",
-                                     input_rank, " dimensions.");
-    }
-
-    int32 wrapped_index = reduction_index;
-    if (wrapped_index < 0) {
-      wrapped_index += input_rank;
-    }
-
-    true_indices.insert(wrapped_index);
+  std::set<int64> true_indices;
+  if (reduction_indices_t->dtype() == DataType::DT_INT32) {
+    TF_RETURN_IF_ERROR(ReductionShapeHelper<int32>(reduction_indices_t,
+                                                   input_rank, true_indices));
+  } else if (reduction_indices_t->dtype() == DataType::DT_INT64) {
+    TF_RETURN_IF_ERROR(ReductionShapeHelper<int64>(reduction_indices_t,
+                                                   input_rank, true_indices));
+  } else {
+    return errors::InvalidArgument(
+        "reduction_indices can only be int32 or int64");
   }
 
   std::vector<DimensionHandle> dims;
@@ -1097,16 +1150,20 @@ Status ConcatShapeHelper(InferenceContext* c, int start_value_index,
     for (int i = start_value_index; i < end_value_index; ++i) {
       if (rank == InferenceContext::kUnknownRank) rank = c->Rank(c->input(i));
       if (rank != InferenceContext::kUnknownRank) {
-        TF_RETURN_IF_ERROR(c->WithRank(c->input(i), rank, &unused));
+        break;
       }
     }
     if (rank == InferenceContext::kUnknownRank) {
       c->set_output(0, c->UnknownShape());
       return Status::OK();
-    }
-    if (rank == 0) {
+    } else if (rank == 0) {
       return errors::InvalidArgument(
           "Can't concatenate scalars (use tf.stack instead)");
+    } else {
+      for (int i = start_value_index; i < end_value_index; ++i) {
+        // Check that all the inputs are of the correct rank.
+        TF_RETURN_IF_ERROR(c->WithRank(c->input(i), rank, &unused));
+      }
     }
     // Build result of <rank> different unknown dims.
     std::vector<DimensionHandle> dims;
@@ -1174,11 +1231,13 @@ Status ConcatV2Shape(InferenceContext* c) {
                            c->num_inputs() - 1 /* dim_index */);
 }
 
-Status BroadcastBinaryOpShapeFn(InferenceContext* c) {
-  ShapeHandle shape_x = c->input(0);
-  ShapeHandle shape_y = c->input(1);
+Status BroadcastBinaryOpOutputShapeFnHelper(InferenceContext* c,
+                                            ShapeHandle shape_x,
+                                            ShapeHandle shape_y,
+                                            ShapeHandle* out) {
+  CHECK_NOTNULL(out);
   if (!c->RankKnown(shape_x) || !c->RankKnown(shape_y)) {
-    c->set_output(0, c->UnknownShape());
+    *out = c->UnknownShape();
     return Status::OK();
   }
   const int32 rank_x = c->Rank(shape_x);
@@ -1215,6 +1274,8 @@ Status BroadcastBinaryOpShapeFn(InferenceContext* c) {
         dims.push_back(dim_y);
       } else if (c->Value(dim_y) == 1) {
         dims.push_back(dim_x);
+      } else if (dim_y.SameHandle(dim_x)) {
+        dims.push_back(dim_x);
       } else {
         dims.push_back(c->UnknownDim());
       }
@@ -1234,7 +1295,7 @@ Status BroadcastBinaryOpShapeFn(InferenceContext* c) {
     }
   }
 
-  c->set_output(0, c->MakeShape(dims));
+  *out = c->MakeShape(dims);
   return Status::OK();
 }
 
@@ -1288,6 +1349,9 @@ Status ValidateSparseTensor(InferenceContext* c, ShapeHandle indices_shape,
 
 Status ScatterNdUpdateShape(InferenceContext* c) {
   ShapeHandle input_shape = c->input(0);
+  if (c->input_handle_shapes_and_types(0) != nullptr) {
+    input_shape = (*c->input_handle_shapes_and_types(0))[0].shape;
+  }
   ShapeHandle indices_shape;
   TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(1), 1, &indices_shape));
   ShapeHandle updates_shape;
@@ -1343,7 +1407,9 @@ Status ScatterNdUpdateShape(InferenceContext* c) {
     }
   }
 
-  c->set_output(0, input_shape);
+  if (c->input_handle_shapes_and_types(0) == nullptr) {
+    c->set_output(0, input_shape);
+  }
   return Status::OK();
 }
 
@@ -1353,6 +1419,21 @@ Status ExplicitShape(InferenceContext* c) {
   ShapeHandle output_shape;
   TF_RETURN_IF_ERROR(c->MakeShapeFromPartialTensorShape(shape, &output_shape));
   c->set_output(0, output_shape);
+  return Status::OK();
+}
+
+Status ExplicitShapes(InferenceContext* c) {
+  std::vector<PartialTensorShape> shapes;
+  TF_RETURN_IF_ERROR(c->GetAttr("shapes", &shapes));
+  if (shapes.empty()) {
+    return errors::Internal("shapes attribute is empty");
+  }
+  for (int i = 0; i < shapes.size(); ++i) {
+    ShapeHandle output_shape;
+    TF_RETURN_IF_ERROR(
+        c->MakeShapeFromPartialTensorShape(shapes[i], &output_shape));
+    c->set_output(i, output_shape);
+  }
   return Status::OK();
 }
 

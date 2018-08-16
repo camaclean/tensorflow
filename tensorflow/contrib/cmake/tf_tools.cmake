@@ -48,9 +48,6 @@ file(GLOB_RECURSE tf_tools_transform_graph_lib_exclude_srcs
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/compare_graphs.cc"
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/summarize_graph_main.cc"
     "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/transform_graph_main.cc"
-    "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/quantize_nodes.cc"
-    "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/quantize_weights.cc"
-    "${tensorflow_source_dir}/tensorflow/tools/graph_transforms/round_weights.cc"
 )
 list(REMOVE_ITEM tf_tools_transform_graph_lib_srcs ${tf_tools_transform_graph_lib_exclude_srcs})
 
@@ -113,6 +110,7 @@ target_link_libraries(${benchmark_model} PUBLIC
   ${tf_core_gpu_kernels_lib}
   ${tensorflow_EXTERNAL_LIBRARIES}
 )
+
 install(TARGETS ${transform_graph} ${summarize_graph} ${compare_graphs} ${benchmark_model}
     EXPORT TensorflowToolsTargets
     LIBRARY DESTINATION "lib${LIBSUFFIX}"

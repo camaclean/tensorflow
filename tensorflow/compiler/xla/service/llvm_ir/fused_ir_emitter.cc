@@ -22,7 +22,7 @@ limitations under the License.
 #include "tensorflow/compiler/xla/service/elemental_ir_emitter.h"
 #include "tensorflow/compiler/xla/service/llvm_ir/ir_array.h"
 #include "tensorflow/compiler/xla/service/llvm_ir/llvm_util.h"
-#include "tensorflow/compiler/xla/service/llvm_ir/ops.h"
+#include "tensorflow/compiler/xla/service/llvm_ir/tuple_ops.h"
 #include "tensorflow/compiler/xla/status_macros.h"
 #include "tensorflow/compiler/xla/statusor.h"
 #include "tensorflow/compiler/xla/util.h"
@@ -72,25 +72,28 @@ Status FusedIrEmitter::DefaultAction(HloInstruction* hlo) {
   return Status::OK();
 }
 
-Status FusedIrEmitter::HandleConstant(HloInstruction* constant,
-                                      const Literal& literal) {
+Status FusedIrEmitter::HandleConstant(HloInstruction* constant) {
+  const Literal& literal = constant->literal();
   llvm::Constant* initializer =
-      llvm_ir::ConvertLiteralToIrConstant(literal, ir_builder_);
+      llvm_ir::ConvertLiteralToIrConstant(literal, module_);
   llvm::GlobalVariable* global = new llvm::GlobalVariable(
       *ir_builder_->GetInsertBlock()->getModule(), initializer->getType(),
       /*isConstant=*/true, llvm::GlobalValue::ExternalLinkage, initializer,
       /*Name=*/"");
+  llvm::Constant* shape_constant = llvm::ConstantExpr::getBitCast(
+      global, llvm_ir::ShapeToIrType(literal.shape(), module_)->getPointerTo());
   generators_[constant] = [=](const IrArray::Index& index) {
-    return IrArray(global, constant->shape())
+    return IrArray(shape_constant, constant->shape())
         .EmitReadArrayElement(index, ir_builder_);
   };
 
   return Status::OK();
 }
 
-Status FusedIrEmitter::HandleGetTupleElement(HloInstruction* get_tuple_element,
-                                             HloInstruction* operand) {
+Status FusedIrEmitter::HandleGetTupleElement(
+    HloInstruction* get_tuple_element) {
   // Lookup ir value for 'operand'.
+  auto operand = get_tuple_element->operand(0);
   auto it = gte_values_.find(operand);
   if (it == gte_values_.end()) {
     return Unimplemented(
@@ -101,7 +104,7 @@ Status FusedIrEmitter::HandleGetTupleElement(HloInstruction* get_tuple_element,
   // Emit code to lookup tuple element pointer, and store it in 'gte_values_'.
   llvm::Value* tuple_element_ptr = llvm_ir::EmitGetTupleElement(
       get_tuple_element->shape(), get_tuple_element->tuple_index(),
-      /*alignment=*/1, it->second, ir_builder_);
+      /*alignment=*/1, it->second, ir_builder_, module_);
   gte_values_.insert(std::make_pair(get_tuple_element, tuple_element_ptr));
   // Emit code to read base tuple element array (if non-tuple shaped).
   if (!ShapeUtil::IsTuple(get_tuple_element->shape())) {
@@ -116,7 +119,24 @@ Status FusedIrEmitter::HandleGetTupleElement(HloInstruction* get_tuple_element,
 }
 
 Status FusedIrEmitter::HandleParameter(HloInstruction* parameter) {
-  generators_[parameter] = [=](const IrArray::Index& index) {
+  generators_[parameter] = [=](const IrArray::Index& index) -> llvm::Value* {
+    if (tiled_parameter_info_) {
+      if (llvm::Value* param_tile_buffer =
+              tiled_parameter_info_->GetBufferForParameter(
+                  parameter->parameter_number())) {
+        // TODO(jlebar): Add AA metadata to this load.  Tile buffers are global
+        // variables, so LLVM's points-to analysis doesn't help us much.  And we
+        // want the AA info to be present before address spaces are inferred
+        // (which is pretty late in the pipeline), so even if we had
+        // address-space-based AA in LLVM, it wouldn't help us much here.
+        return ir_builder_->CreateLoad(
+            ir_builder_->CreateGEP(
+                param_tile_buffer,
+                {index.GetConstantWithIndexType(0), tiled_parameter_info_->x(),
+                 tiled_parameter_info_->y()}),
+            "tiled_buffer");
+      }
+    }
     return parameter_arrays_[parameter->parameter_number()]
         .EmitReadArrayElement(index, ir_builder_);
   };
@@ -128,13 +148,12 @@ Status FusedIrEmitter::HandleParameter(HloInstruction* parameter) {
   return Status::OK();
 }
 
-Status FusedIrEmitter::HandleTuple(
-    HloInstruction* tuple,
-    tensorflow::gtl::ArraySlice<HloInstruction*> operands) {
+Status FusedIrEmitter::HandleTuple(HloInstruction* tuple) {
+  tensorflow::gtl::ArraySlice<HloInstruction*> operands(tuple->operands());
   std::vector<llvm::Type*> operand_elemental_ir_types;
   for (HloInstruction* operand : operands) {
     operand_elemental_ir_types.push_back(llvm_ir::PrimitiveTypeToIrType(
-        operand->shape().element_type(), ir_builder_));
+        operand->shape().element_type(), module_));
   }
   generators_[tuple] =
       [=](const IrArray::Index& index) -> StatusOr<llvm::Value*> {
@@ -151,7 +170,7 @@ Status FusedIrEmitter::HandleTuple(
 
 Status FusedIrEmitter::FinishVisit(HloInstruction* root) {
   fused_root_ = root;
-  return tensorflow::Status::OK();
+  return Status::OK();
 }
 
 FusedIrEmitter::Generator FusedIrEmitter::GetRootGenerator() const {

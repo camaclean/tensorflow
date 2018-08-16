@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""SinhArcsinh transformation of a distribution."""
+"""Multi-dimensional (Vector) SinhArcsinh transformation of a distribution."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -25,6 +25,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import normal
 from tensorflow.python.ops.distributions import transformed_distribution
+from tensorflow.python.util import deprecation
 
 __all__ = [
     "VectorSinhArcsinhDiag",
@@ -52,8 +53,9 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   matrix multiplication):
 
   ```
-  Y := loc + scale @ F(Z) * (2 / F(2))
+  Y := loc + scale @ F(Z) * (2 / F_0(2))
   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+  F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
   ```
 
   This distribution is similar to the location-scale transformation
@@ -62,7 +64,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   * If `skewness = 0` and `tailweight = 1` (the defaults), `F(Z) = Z`, and then
     `Y = L(Z)` exactly.
   * `loc` is used in both to shift the result by a constant factor.
-  * Our definition of `C` ensures that
+  * The multiplication of `scale` by `2 / F_0(2)` ensures that if `skewness = 0`
     `P[Y - loc <= 2 * scale] = P[L(Z) - loc <= 2 * scale]`.
     Thus it can be said that the weights in the tails of `Y` and `L(Z)` beyond
     `loc + 2 * scale` are the same.
@@ -85,15 +87,23 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
   `|Z| >> (|skewness| * tailweight)**tailweight`, we have
   `Y approx 0.5 Z**tailweight e**(sign(Z) skewness * tailweight)`.
 
-  To see the argument about `C` and quantiles, note that
+  To see the argument regarding multiplying `scale` by `2 / F_0(2)`,
 
   ```
-  P[(Y - loc) / scale <= 2] = P[F(Z) <= 2 * scale / C]
-                             = P[Z <= F^{-1}(2 * scale / C)]
-                             = P[Z <= 2].
+  P[(Y - loc) / scale <= 2] = P[F(Z) * (2 / F_0(2)) <= 2]
+                            = P[F(Z) <= F_0(2)]
+                            = P[Z <= 2]  (if F = F_0).
   ```
   """
 
+  @deprecation.deprecated(
+      "2018-10-01",
+      "The TensorFlow Distributions library has moved to "
+      "TensorFlow Probability "
+      "(https://github.com/tensorflow/probability). You "
+      "should update all references to use `tfp.distributions` "
+      "instead of `tf.contrib.distributions`.",
+      warn_once=True)
   def __init__(self,
                loc=None,
                scale_diag=None,
@@ -142,7 +152,7 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
         broadcastable with `event_shape`.
       distribution: `tf.Distribution`-like instance. Distribution from which `k`
         iid samples are used as input to transformation `F`.  Default is
-        `ds.Normal(0., 1.)`.
+        `tf.distributions.Normal(loc=0., scale=1.)`.
         Must be a scalar-batch, scalar-event distribution.  Typically
         `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
         a function of non-trainable parameters. WARNING: If you backprop through
@@ -162,21 +172,23 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
     Raises:
       ValueError: if at most `scale_identity_multiplier` is specified.
     """
-    parameters = locals()
+    parameters = dict(locals())
 
     with ops.name_scope(
         name,
         values=[
             loc, scale_diag, scale_identity_multiplier, skewness, tailweight
-        ]):
+        ]) as name:
       loc = ops.convert_to_tensor(loc, name="loc") if loc is not None else loc
       tailweight = 1. if tailweight is None else tailweight
+      has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
 
       # Recall, with Z a random variable,
       #   Y := loc + C * F(Z),
       #   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
-      #   C := 2 * scale / F(2)
+      #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
+      #   C := 2 * scale / F_0(2)
 
       # Construct shapes and 'scale' out of the scale_* and loc kwargs.
       # scale_linop is only an intermediary to:
@@ -212,12 +224,19 @@ class VectorSinhArcsinhDiag(transformed_distribution.TransformedDistribution):
       tailweight = ops.convert_to_tensor(
           tailweight, dtype=dtype, name="tailweight")
       f = bijectors.SinhArcsinh(
-          skewness=skewness, tailweight=tailweight, event_ndims=1)
+          skewness=skewness, tailweight=tailweight)
+      if has_default_skewness:
+        f_noskew = f
+      else:
+        f_noskew = bijectors.SinhArcsinh(
+            skewness=skewness.dtype.as_numpy_dtype(0.),
+            tailweight=tailweight)
 
       # Make the Affine bijector, Z --> loc + C * Z.
-      c = 2 * scale_diag_part / f.forward(ops.convert_to_tensor(2, dtype=dtype))
+      c = 2 * scale_diag_part / f_noskew.forward(
+          ops.convert_to_tensor(2, dtype=dtype))
       affine = bijectors.Affine(
-          shift=loc, scale_diag=c, validate_args=validate_args, event_ndims=1)
+          shift=loc, scale_diag=c, validate_args=validate_args)
 
       bijector = bijectors.Chain([affine, f])
 

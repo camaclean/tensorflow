@@ -25,6 +25,7 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops.distributions import normal
 from tensorflow.python.ops.distributions import transformed_distribution
+from tensorflow.python.util import deprecation
 
 __all__ = [
     "SinhArcsinh",
@@ -51,8 +52,9 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   `(loc, scale, skewness, tailweight)`, via the relation:
 
   ```
-  Y := loc + scale * F(Z) * (2 / F(2))
+  Y := loc + scale * F(Z) * (2 / F_0(2))
   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
+  F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
   ```
 
   This distribution is similar to the location-scale transformation
@@ -61,7 +63,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   * If `skewness = 0` and `tailweight = 1` (the defaults), `F(Z) = Z`, and then
     `Y = L(Z)` exactly.
   * `loc` is used in both to shift the result by a constant factor.
-  * Our definition of `C` ensures that
+  * The multiplication of `scale` by `2 / F_0(2)` ensures that if `skewness = 0`
     `P[Y - loc <= 2 * scale] = P[L(Z) - loc <= 2 * scale]`.
     Thus it can be said that the weights in the tails of `Y` and `L(Z)` beyond
     `loc + 2 * scale` are the same.
@@ -84,15 +86,23 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
   `|Z| >> (|skewness| * tailweight)**tailweight`, we have
   `Y approx 0.5 Z**tailweight e**(sign(Z) skewness * tailweight)`.
 
-  To see the argument about `C` and quantiles, note that
+  To see the argument regarding multiplying `scale` by `2 / F_0(2)`,
 
   ```
-  P[(Y - loc) / scale <= 2] = P[F(Z) <= 2 * scale / C]
-                             = P[Z <= F^{-1}(2 * scale / C)]
-                             = P[Z <= 2].
+  P[(Y - loc) / scale <= 2] = P[F(Z) * (2 / F_0(2)) <= 2]
+                            = P[F(Z) <= F_0(2)]
+                            = P[Z <= 2]  (if F = F_0).
   ```
   """
 
+  @deprecation.deprecated(
+      "2018-10-01",
+      "The TensorFlow Distributions library has moved to "
+      "TensorFlow Probability "
+      "(https://github.com/tensorflow/probability). You "
+      "should update all references to use `tfp.distributions` "
+      "instead of `tf.contrib.distributions`.",
+      warn_once=True)
   def __init__(self,
                loc,
                scale,
@@ -101,7 +111,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
                distribution=None,
                validate_args=False,
                allow_nan_stats=True,
-               name="MultivariateNormalLinearOperator"):
+               name="SinhArcsinh"):
     """Construct SinhArcsinh distribution on `(-inf, inf)`.
 
     Arguments `(loc, scale, skewness, tailweight)` must have broadcastable shape
@@ -114,7 +124,7 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       tailweight:  Tailweight parameter. Default is `1.0` (unchanged tailweight)
       distribution: `tf.Distribution`-like instance. Distribution that is
         transformed to produce this distribution.
-        Default is `ds.Normal(0., 1.)`.
+        Default is `tf.distributions.Normal(0., 1.)`.
         Must be a scalar-batch, scalar-event distribution.  Typically
         `distribution.reparameterization_type = FULLY_REPARAMETERIZED` or it is
         a function of non-trainable parameters. WARNING: If you backprop through
@@ -131,13 +141,15 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
         if one or more of the statistic's batch members are undefined.
       name: Python `str` name prefixed to Ops created by this class.
     """
-    parameters = locals()
+    parameters = dict(locals())
 
-    with ops.name_scope(name, values=[loc, scale, skewness, tailweight]):
+    with ops.name_scope(name,
+                        values=[loc, scale, skewness, tailweight]) as name:
       loc = ops.convert_to_tensor(loc, name="loc")
       dtype = loc.dtype
       scale = ops.convert_to_tensor(scale, name="scale", dtype=dtype)
       tailweight = 1. if tailweight is None else tailweight
+      has_default_skewness = skewness is None
       skewness = 0. if skewness is None else skewness
       tailweight = ops.convert_to_tensor(
           tailweight, name="tailweight", dtype=dtype)
@@ -149,7 +161,8 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
       # Recall, with Z a random variable,
       #   Y := loc + C * F(Z),
       #   F(Z) := Sinh( (Arcsinh(Z) + skewness) * tailweight )
-      #   C := 2 * scale / F(2)
+      #   F_0(Z) := Sinh( Arcsinh(Z) * tailweight )
+      #   C := 2 * scale / F_0(2)
       if distribution is None:
         distribution = normal.Normal(
             loc=array_ops.zeros([], dtype=dtype),
@@ -163,15 +176,20 @@ class SinhArcsinh(transformed_distribution.TransformedDistribution):
 
       # Make the SAS bijector, 'F'.
       f = bijectors.SinhArcsinh(
-          skewness=skewness, tailweight=tailweight, event_ndims=0)
+          skewness=skewness, tailweight=tailweight)
+      if has_default_skewness:
+        f_noskew = f
+      else:
+        f_noskew = bijectors.SinhArcsinh(
+            skewness=skewness.dtype.as_numpy_dtype(0.),
+            tailweight=tailweight)
 
-      # Make the Affine bijector, Z --> loc + C * Z.
-      c = 2 * scale / f.forward(ops.convert_to_tensor(2, dtype=dtype))
-      affine = bijectors.Affine(
+      # Make the AffineScalar bijector, Z --> loc + scale * Z (2 / F_0(2))
+      c = 2 * scale / f_noskew.forward(ops.convert_to_tensor(2, dtype=dtype))
+      affine = bijectors.AffineScalar(
           shift=loc,
-          scale_identity_multiplier=c,
-          validate_args=validate_args,
-          event_ndims=0)
+          scale=c,
+          validate_args=validate_args)
 
       bijector = bijectors.Chain([affine, f])
 

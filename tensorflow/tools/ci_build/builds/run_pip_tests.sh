@@ -78,6 +78,7 @@ ln -s $(pwd)/tensorflow ${PIP_TEST_ROOT}/tensorflow
 # tests with no_pip_gpu tag.
 PIP_TEST_FILTER_TAG="-no_pip,-no_oss"
 if [[ ${IS_OSS_SERIAL} == "1" ]]; then
+  PIP_TEST_FILTER_TAG="$(echo "${PIP_TEST_FILTER_TAG}" | sed s/-no_oss//)"
   PIP_TEST_FILTER_TAG="${PIP_TEST_FILTER_TAG},oss_serial"
 else
   PIP_TEST_FILTER_TAG="${PIP_TEST_FILTER_TAG},-oss_serial"
@@ -96,7 +97,8 @@ fi
 #     TF_BUILD_APPEND_ARGUMENTS any user supplied args.
 BAZEL_FLAGS="--define=no_tensorflow_py_deps=true --test_lang_filters=py \
   --build_tests_only -k --test_tag_filters=${PIP_TEST_FILTER_TAG} \
-  --test_timeout 300,450,1200,3600 ${TF_BUILD_APPEND_ARGUMENTS}"
+  --test_timeout 300,450,1200,3600 ${TF_BUILD_APPEND_ARGUMENTS} \
+  --test_output=errors"
 
 BAZEL_TEST_TARGETS="//${PIP_TEST_PREFIX}/tensorflow/contrib/... \
   //${PIP_TEST_PREFIX}/tensorflow/python/... \

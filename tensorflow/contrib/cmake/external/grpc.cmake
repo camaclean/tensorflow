@@ -12,19 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-include (ExternalProject)
 
-set(GRPC_INCLUDE_DIRS /mnt/bwpy/single/usr/include/grpc)
-set(GRPC_URL https://github.com/grpc/grpc.git)
-set(GRPC_BUILD ${CMAKE_CURRENT_BINARY_DIR}/grpc/src/grpc)
-set(GRPC_TAG 781fd6f6ea03645a520cd5c675da67ab61f87e4b)
+#set(GRPC_INCLUDE_DIRS /mnt/bwpy/single/usr/include/grpc)
+#find_package(gRPC)
 
-find_package(gRPC)
-set(GRPC_BUILD /mnt/bwpy/single/usr/bin)
-
-set(grpc_STATIC_LIBRARIES
-    gRPC::grpc++_unsecure
-    gRPC::grpc_unsecure
-    gRPC::gpr
-    /mnt/bwpy/single/usr/lib/libcares.so
-)
+#set(grpc_STATIC_LIBRARIES
+#    gRPC::grpc++_unsecure
+#    gRPC::grpc_unsecure
+#    gRPC::gpr
+#)

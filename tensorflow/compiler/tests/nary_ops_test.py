@@ -22,14 +22,14 @@ import unittest
 
 import numpy as np
 
-from tensorflow.compiler.tests.xla_test import XLATestCase
+from tensorflow.compiler.tests import xla_test
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 from tensorflow.python.platform import googletest
 
 
-class NAryOpsTest(XLATestCase):
+class NAryOpsTest(xla_test.XLATestCase):
 
   def _testNAry(self, op, args, expected, equality_fn=None):
     with self.test_session() as session:
@@ -67,6 +67,26 @@ class NAryOpsTest(XLATestCase):
                     np.array([10], dtype=np.float32),
                     np.array([42], dtype=np.float32)],
                    expected=np.array([48], dtype=np.float32))
+
+  def testComplex(self):
+    for dtype in self.complex_types:
+      self._testNAry(
+          math_ops.add_n, [np.array([[1 + 2j, 2 - 3j, 3 + 4j]], dtype=dtype)],
+          expected=np.array([[1 + 2j, 2 - 3j, 3 + 4j]], dtype=dtype))
+
+      self._testNAry(
+          math_ops.add_n, [
+              np.array([1 + 2j, 2 - 3j], dtype=dtype),
+              np.array([10j, 20], dtype=dtype)
+          ],
+          expected=np.array([1 + 12j, 22 - 3j], dtype=dtype))
+      self._testNAry(
+          math_ops.add_n, [
+              np.array([-4, 5j], dtype=dtype),
+              np.array([2 + 10j, -2], dtype=dtype),
+              np.array([42j, 3 + 3j], dtype=dtype)
+          ],
+          expected=np.array([-2 + 52j, 1 + 8j], dtype=dtype))
 
   @unittest.skip("IdentityN is temporarily CompilationOnly as workaround")
   def testIdentityN(self):

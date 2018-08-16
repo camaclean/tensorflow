@@ -71,6 +71,23 @@ class SelfAdjointEigTest(test.TestCase):
       self.assertAllEqual(val[4], val[5])
       self.assertAllEqual(val[1], val[3])
 
+  def testMatrixThatFailsWhenFlushingDenormsToZero(self):
+    # Test a 32x32 matrix which is known to fail if denorm floats are flushed to
+    # zero.
+    matrix = np.genfromtxt(
+        test.test_src_dir_path(
+            "python/kernel_tests/testdata/"
+            "self_adjoint_eig_fail_if_denorms_flushed.txt")).astype(np.float32)
+    self.assertEqual(matrix.shape, (32, 32))
+    matrix_tensor = constant_op.constant(matrix)
+    with self.test_session(use_gpu=True) as sess:
+      (e, v) = sess.run(linalg_ops.self_adjoint_eig(matrix_tensor))
+      self.assertEqual(e.size, 32)
+      self.assertAllClose(
+          np.matmul(v, v.transpose()), np.eye(32, dtype=np.float32), atol=2e-3)
+      self.assertAllClose(matrix,
+                          np.matmul(np.matmul(v, np.diag(e)), v.transpose()))
+
 
 def SortEigenDecomposition(e, v):
   if v.ndim < 2:
@@ -190,13 +207,17 @@ def _GetSelfAdjointEigGradTest(dtype_, shape_, compute_v_):
         tf_e, tf_v = linalg_ops.self_adjoint_eig(tf_a)
         # (complex) Eigenvectors are only unique up to an arbitrary phase
         # We normalize the vectors such that the first component has phase 0.
-        reference = tf_v / linalg_ops.norm(
-            tf_v[..., 0:1, :], axis=-1, keep_dims=True)
-        tf_v *= math_ops.conj(reference)
+        top_rows = tf_v[..., 0:1, :]
+        if tf_a.dtype.is_complex:
+          angle = -math_ops.angle(top_rows)
+          phase = math_ops.complex(math_ops.cos(angle), math_ops.sin(angle))
+        else:
+          phase = math_ops.sign(top_rows)
+        tf_v *= phase
         outputs = [tf_e, tf_v]
       else:
         tf_e = linalg_ops.self_adjoint_eigvals(tf_a)
-        outputs = [tf_e,]
+        outputs = [tf_e]
       for b in outputs:
         x_init = np.random.uniform(
             low=-1.0, high=1.0, size=n * n).reshape([n, n]).astype(np_dtype)

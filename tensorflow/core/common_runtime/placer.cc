@@ -29,6 +29,7 @@ limitations under the License.
 #include "tensorflow/core/framework/types.pb.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/stringpiece.h"
+#include "tensorflow/core/lib/strings/str_util.h"
 
 namespace tensorflow {
 
@@ -129,7 +130,7 @@ class ColocationGraph {
     // 'string' values stored in NodeDef attribute lists, as well as StringPiece
     // values that refer to 'string' values from NodeDef::name(), without
     // performing any string allocations.
-    std::unordered_map<StringPiece, const Node*, StringPiece::Hasher>
+    std::unordered_map<StringPiece, const Node*, StringPieceHasher>
         colocation_group_root;
 
     for (Node* node : graph_->nodes()) {
@@ -151,7 +152,8 @@ class ColocationGraph {
       if (attr_value != nullptr && attr_value->has_list()) {
         for (const string& class_spec : attr_value->list().s()) {
           StringPiece spec(class_spec);
-          if (spec.Consume(kColocationGroupPrefixStringPiece)) {
+          if (str_util::ConsumePrefix(&spec,
+                                      kColocationGroupPrefixStringPiece)) {
             found_spec = true;
             TF_RETURN_IF_ERROR(
                 ColocateNodeToGroup(&colocation_group_root, node, spec));
@@ -171,7 +173,7 @@ class ColocationGraph {
   }
 
   Status ColocateNodeToGroup(
-      std::unordered_map<StringPiece, const Node*, StringPiece::Hasher>*
+      std::unordered_map<StringPiece, const Node*, StringPieceHasher>*
           colocation_group_root,
       Node* node, StringPiece colocation_group) {
     const Node*& root_node = (*colocation_group_root)[colocation_group];
@@ -369,7 +371,8 @@ class ColocationGraph {
                 "Could not satisfy explicit device specification '",
                 node->requested_device(), "' because no supported kernel for ",
                 specified_device_name.type, " devices is available.",
-                debug_info);
+                debug_info, "\nRegistered kernels:\n",
+                KernelsRegisteredForOp(node->type_string()));
           } else {
             return errors::InvalidArgument(
                 "Could not satisfy explicit device specification '",
@@ -463,6 +466,7 @@ class ColocationGraph {
     // the user can see why an unsatisfiable placement occurred.
 
     std::unordered_map<string, string> type_to_devices;
+    std::vector<const Node*> colocation_nodes;
     int num_nodes_found = 0;
 
     for (const Node* node : graph_->nodes()) {
@@ -474,6 +478,7 @@ class ColocationGraph {
         continue;
       }
       ++num_nodes_found;
+      colocation_nodes.push_back(node);
       const string& op_type = node->type_string();
       string devices_registered;
       for (const auto& device_type : members_[id].supported_device_types) {
@@ -487,6 +492,13 @@ class ColocationGraph {
     for (const auto& td : type_to_devices) {
       strings::StrAppend(&text, "\n", td.first, ": ", td.second);
     }
+    strings::StrAppend(&text,
+                       "\n\nColocation members and user-requested devices:");
+    for (const Node* node : colocation_nodes) {
+      strings::StrAppend(&text, "\n  ", node->name(), " (", node->type_string(),
+                         ") ", node->requested_device());
+    }
+    strings::StrAppend(&text, "\n");
 
     if (num_nodes_found <= 1) {
       text.clear();
@@ -616,6 +628,40 @@ class ColocationGraph {
     return parent;
   }
 
+  // Ensures that the devices of 'dst's resource and reference match the device
+  // specified for 'src', which is an input of 'dst' with a partially or fully
+  // specified device.
+  Status VerifyResourceAndRefInputsCanBeColocated(
+      const Node* dst, const Node* src,
+      const DeviceNameUtils::ParsedName& src_parsed_name) {
+    std::vector<const Edge*> edges;
+    TF_RETURN_IF_ERROR(dst->input_edges(&edges));
+    for (const Edge* edge : edges) {
+      DataType input_type = dst->input_type(edge->dst_input());
+      if (input_type == DT_RESOURCE || IsRefType(input_type)) {
+        const Node* input_node = edge->src();
+        if (input_node == src) {
+          continue;
+        }
+        const auto& input_root = members_[FindRoot(input_node->id())];
+        const auto& input_parsed_name = input_root.device_name;
+        if (DeviceNameUtils::HasSomeDetails(input_parsed_name) &&
+            !DeviceNameUtils::AreCompatibleDevNames(input_parsed_name,
+                                                    src_parsed_name)) {
+          return AttachDef(
+              errors::InvalidArgument(
+                  "Could not colocate node with its "
+                  "resource and reference inputs; devices ",
+                  DeviceNameUtils::ParsedNameToString(input_parsed_name),
+                  " and ", DeviceNameUtils::ParsedNameToString(src_parsed_name),
+                  " are not compatible."),
+              *dst);
+        }
+      }
+    }
+    return Status::OK();
+  }
+
   Graph* const graph_;  // Not owned.
   std::vector<Member> members_;
   const DeviceSet* device_set_;  // Not owned.
@@ -632,6 +678,15 @@ class ColocationGraph {
 bool IsGeneratorNode(const Node* node) {
   return node->num_inputs() == 0 && node->num_outputs() == 1 &&
          !IsRefType(node->output_type(0));
+}
+
+bool IsExemptFromResourceInputColocation(const Node* node) {
+  // Note: Partitioned function calls, which place and partition their
+  // function bodies, are exempt from this check: they forward resource and
+  // ref inputs to operations that are appropriately placed, instead of
+  // dereferencing them.
+  const string& op_type = node->op_def().name();
+  return op_type == "PartitionedCall" || op_type == "StatefulPartitionedCall";
 }
 
 }  // namespace
@@ -668,8 +723,8 @@ Status Placer::Run() {
   // 2. Enumerate the constraint edges, and use them to update the disjoint
   // node set.
 
-  // If `node` has an input edge with reference type, add an
-  // edge from the source of that edge to `node`.
+  // If `node` has an input edge with reference type, add an edge from the
+  // source of that edge to `node`.
   for (const Edge* edge : graph_->edges()) {
     if (edge->IsControlEdge()) {
       continue;
@@ -677,7 +732,10 @@ Status Placer::Run() {
     Node* src = edge->src();
     Node* dst = edge->dst();
     DataType input_type = dst->input_type(edge->dst_input());
-    if (input_type == DT_RESOURCE || IsRefType(input_type)) {
+    if ((input_type == DT_RESOURCE || IsRefType(input_type)) &&
+        !IsExemptFromResourceInputColocation(dst)) {
+      // Colocate `src` and `dst` to maintain the invariant that nodes connected
+      // by reference edges are colocated.
       int src_root_id = colocation_graph.FindRoot(src->id());
       int dst_root_id = colocation_graph.FindRoot(dst->id());
       auto& src_root = colocation_graph.members_[src_root_id];
@@ -694,6 +752,9 @@ Status Placer::Run() {
         // incompatible.
         if (!DeviceNameUtils::AreCompatibleDevNames(source_parsed_name,
                                                     dest_parsed_name)) {
+          TF_RETURN_IF_ERROR(
+              colocation_graph.VerifyResourceAndRefInputsCanBeColocated(
+                  dst, src, source_parsed_name));
           if (log_device_placement_) {
             LOG(INFO) << "Ignoring device specification "
                       << DeviceNameUtils::ParsedNameToString(dest_parsed_name)

@@ -15,16 +15,24 @@ limitations under the License.
 
 #include "tensorflow/stream_executor/dnn.h"
 
+#include "tensorflow/core/lib/hash/hash.h"
 #include "tensorflow/stream_executor/lib/strcat.h"
 #include "tensorflow/stream_executor/lib/stringprintf.h"
 
-namespace perftools {
-namespace gputools {
+namespace stream_executor {
 namespace dnn {
+
+uint64 AlgorithmDesc::hash() const {
+  return ::tensorflow::Hash64Combine(algo_, tensor_ops_enabled_);
+}
 
 bool DnnSupport::GetConvolveAlgorithms(
     bool with_winograd_nonfused, int cc_major, int cc_minor,
     std::vector<AlgorithmDesc>* out_algorithms) {
+  return false;
+}
+
+bool DnnSupport::GetRnnAlgorithms(std::vector<AlgorithmDesc>* out_algorithms) {
   return false;
 }
 
@@ -131,6 +139,10 @@ string PadAlignmentString(PadAlignment alignment) {
       return "TensorFlow padding";
   }
   return "unknown pad alignment";
+}
+
+std::ostream& operator<<(std::ostream& str, dnn::PadAlignment alignment) {
+  return str << PadAlignmentString(alignment);
 }
 
 string ShortPoolingModeString(PoolingMode mode) {
@@ -399,6 +411,8 @@ string FilterDescriptor::ToShortString() const {
   switch (layout_) {
     case FilterLayout::kOutputInputYX:
       return port::StrCat(od, id, spatial);
+    case FilterLayout::kOutputYXInput:
+      return port::StrCat(od, spatial, id);
     case FilterLayout::kOutputInputYX4:
       return port::StrCat(od, id, spatial, "(VECT_C)");
     case FilterLayout::kInputYXOutput:
@@ -426,6 +440,7 @@ ConvolutionDescriptor::ConvolutionDescriptor(int ndims)
       filter_strides_(ndims, 1),
       dilation_rates_(ndims, 1),
       pad_alignment_(PadAlignment::kDefault),
+      group_count_(1),
       ndims_(ndims) {}
 
 ConvolutionDescriptor::ConvolutionDescriptor()
@@ -470,6 +485,7 @@ string ConvolutionDescriptor::ToShortString() const {
 PoolingDescriptor::PoolingDescriptor(int ndims)
     : mode_(dnn::PoolingMode::kMaximum),
       ndims_(ndims),
+      propagate_nans_(false),
       window_(ndims, 0),
       padding_(ndims, 0),
       strides_(ndims, 1) {}
@@ -482,6 +498,7 @@ void PoolingDescriptor::CloneFrom(const PoolingDescriptor& other) {
   window_ = other.window_;
   padding_ = other.padding_;
   strides_ = other.strides_;
+  propagate_nans_ = other.propagate_nans_;
 }
 
 string PoolingDescriptor::ToString() const {
@@ -495,9 +512,12 @@ string PoolingDescriptor::ToString() const {
     port::Appendf(&padding, "%lld", padding_[i]);
   }
 
-  return port::Printf("{mode: %s window: %s strides: %s padding: %s}",
-                      mode_string, window.c_str(), strides.c_str(),
-                      padding.c_str());
+  const char* propagate_string = propagate_nans_ ? "Yes" : "No";
+
+  return port::Printf(
+      "{mode: %s window: %s strides: %s padding: %s propagate NaNs: %s}",
+      mode_string, window.c_str(), strides.c_str(), padding.c_str(),
+      propagate_string);
 }
 
 string PoolingDescriptor::ToShortString() const {
@@ -508,7 +528,8 @@ string PoolingDescriptor::ToShortString() const {
     port::Appendf(&padding, "_p%d:%lld", i, padding_[i]);
   }
   return port::StrCat(mode_ == dnn::PoolingMode::kMaximum ? "max" : "avg",
-                      window, strides, padding);
+                      window, strides, padding,
+                      propagate_nans_ ? "propagate_nans" : "ignore_nans");
 }
 
 // -- NormalizeDescriptor
@@ -544,5 +565,4 @@ string NormalizeDescriptor::ToShortString() const {
 }
 
 }  // namespace dnn
-}  // namespace gputools
-}  // namespace perftools
+}  // namespace stream_executor

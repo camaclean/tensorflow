@@ -34,6 +34,35 @@ cc_library(
 )
 
 cc_library(
+    name = "reader",
+    srcs = ["reader.cc"],
+    hdrs = ["reader.h"],
+    deps = [
+        ":constants",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+    ],
+)
+
+tf_cc_test(
+    name = "reader_test",
+    srcs = ["reader_test.cc"],
+    data = [
+        ":saved_model_half_plus_two",
+    ],
+    linkstatic = 1,
+    deps = [
+        ":constants",
+        ":reader",
+        ":tag_constants",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+    ],
+)
+
+cc_library(
     name = "loader",
     hdrs = ["loader.h"],
     deps = [
@@ -54,8 +83,10 @@ cc_library(
     hdrs = ["loader.h"],
     deps = [
         ":constants",
+        ":reader",
     ] + if_not_mobile([
         "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "//tensorflow/core:protos_all_cc",
@@ -92,19 +123,4 @@ filegroup(
         "testdata/half_plus_two_main_op/**",
         "testdata/half_plus_two/**",
     ]),
-)
-
-# -----------------------------------------------------------------------------
-# Google-internal targets.
-
-filegroup(
-    name = "all_files",
-    srcs = glob(
-        ["**/*"],
-        exclude = [
-            "**/METADATA",
-            "**/OWNERS",
-        ],
-    ),
-    visibility = ["//tensorflow:__subpackages__"],
 )

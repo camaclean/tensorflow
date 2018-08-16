@@ -34,8 +34,9 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/common_runtime/dma_helper.h"
 #if GOOGLE_CUDA
+#include "tensorflow/core/common_runtime/gpu/gpu_process_state.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_util.h"
-#include "tensorflow/core/common_runtime/gpu/process_state.h"
+#include "tensorflow/core/common_runtime/process_state.h"
 #endif  // GOOGLE_CUDA
 #include "tensorflow/core/framework/allocator_registry.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -86,8 +87,9 @@ int TryToReadNumaNode(ibv_device* device) {
   if (strings::safe_strto32(content, &value)) {
     if (value < 0) {
       LOG(INFO) << "Successful NUMA node read from SysFS had negative value ("
-                << value << "), but there must be at least one NUMA node"
-                            ", so returning NUMA node zero";
+                << value
+                << "), but there must be at least one NUMA node"
+                   ", so returning NUMA node zero";
       return 0;
     }
     LOG(INFO) << "NUMA node for device: " << device->name << " is " << value;
@@ -273,7 +275,7 @@ Status GdrMemoryManager::Init() {
 
   Allocator* allocators[] = {
 #if GOOGLE_CUDA
-    ProcessState::singleton()->GetCUDAHostAllocator(0),
+    GPUProcessState::singleton()->GetCUDAHostAllocator(0),
     ProcessState::singleton()->GetCPUAllocator(0),
 #endif  // GOOGLE_CUDA
     cpu_allocator(),
@@ -290,8 +292,8 @@ Status GdrMemoryManager::Init() {
   // Host memory allocators
   for (Allocator* allocator : allocators) {
     auto* visitable_allocator = dynamic_cast<VisitableAllocator*>(allocator);
-    CHECK(visitable_allocator) << "is not visitable for instrumentation"
-                               << allocator->Name();
+    CHECK(visitable_allocator)
+        << "is not visitable for instrumentation" << allocator->Name();
     // Make sure we don't instrument the same allocator twice
     if (instrumented_.find(allocator) == std::end(instrumented_)) {
       visitable_allocator->AddAllocVisitor(alloc_visitor);
@@ -307,7 +309,8 @@ Status GdrMemoryManager::Init() {
   if (IsGDRAvailable()) {
     // Note we don't free allocated GPU memory so there is no free visitor
     int32_t bus_id = TryToReadNumaNode(listening_->verbs->device) + 1;
-    ProcessState::singleton()->AddGPUAllocVisitor(bus_id, cuda_alloc_visitor);
+    GPUProcessState::singleton()->AddGPUAllocVisitor(bus_id,
+                                                     cuda_alloc_visitor);
     LOG(INFO) << "Instrumenting GPU allocator with bus_id " << bus_id;
   }
 #endif  // GOOGLE_CUDA
@@ -429,7 +432,7 @@ void GdrMemoryManager::TransportOptionsFromTensor(
 
 #if GOOGLE_CUDA
   if (!on_host) {
-    Allocator* alloc = ProcessState::singleton()->GetCUDAHostAllocator(0);
+    Allocator* alloc = GPUProcessState::singleton()->GetCUDAHostAllocator(0);
     Tensor* host_copy = new Tensor(alloc, tensor.dtype(), tensor.shape());
     GPUUtil::CopyGPUTensorToCPU(
         device, device_context, &tensor, host_copy,
@@ -531,7 +534,7 @@ void GdrMemoryManager::TensorFromTransportOptions(
   Tensor host_copy;
 #if GOOGLE_CUDA
   if (mr == nullptr && !on_host) {
-    Allocator* alloc = ProcessState::singleton()->GetCUDAHostAllocator(0);
+    Allocator* alloc = GPUProcessState::singleton()->GetCUDAHostAllocator(0);
     host_copy = Tensor(alloc, tensor->dtype(), tensor->shape());
     buffer = DMAHelper::buffer(&host_copy);
     addr = buffer->data();
@@ -635,8 +638,8 @@ void GdrMemoryManager::TensorFromTransportOptions(
     } else {
       checksum = GPUUtil::Checksum(*tensor);
     }
-    CHECK(checksum == remote_mr.checksum()) << "Checksum mismatch: " << checksum
-                                            << "!=" << remote_mr.checksum();
+    CHECK(checksum == remote_mr.checksum())
+        << "Checksum mismatch: " << checksum << "!=" << remote_mr.checksum();
 #endif
   }
   done(Status::OK());
