@@ -252,7 +252,7 @@ file(GLOB_RECURSE tpu_ops_srcs
      "${tensorflow_source_dir}/tensorflow/contrib/tpu/ops/*.cc"
 )
 
-GENERATE_CONTRIB_OP_LIBRARY(batch "${tensorflow_source_dir}/tensorflow/contrib/batching/ops/batch_ops.cc")
+#GENERATE_CONTRIB_OP_LIBRARY(batch "${tensorflow_source_dir}/tensorflow/contrib/batching/ops/batch_ops.cc")
 #GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_ensemble_optimizer "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/ensemble_optimizer_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_model "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/model_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_split_handler "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/split_handler_ops.cc")
@@ -545,18 +545,6 @@ AddUserOps(TARGET factorization_ops
     SOURCES "${tf_factorization_srcs}"
     DEPENDS tf_contrib_factorization_factorization_ops)
 
-if(tensorflow_ENABLE_GPU)
-    set(tf_cudnn_rnn_srcs
-        "${tensorflow_source_dir}/tensorflow/contrib/cudnn_rnn/kernels/cudnn_rnn_ops.cc"
-        $<TARGET_OBJECTS:tf_contrib_cudnn_rnn_ops>
-    )
-
-    AddUserOps(TARGET cudnn_rnn_ops
-        SOURCES "${tf_cudnn_rnn_srcs}"
-        DEPENDS tf_contrib_cudnn_rnn_ops
-	LIBS ${CUDA_LIBRARIES})
-endif()
-
 set(tf_boosted_trees_utils_srcs
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/utils/batch_features.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/utils/dropout_utils.cc"
@@ -579,81 +567,36 @@ install(TARGETS boosted_trees_utils
     EXPORT TensorflowContribTargets
     LIBRARY DESTINATION "lib${LIBSUFFIX}/tensorflow/contrib")
 
-set(tf_boosted_trees_model_srcs
+set(tf_boosted_trees_srcs
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/model_ops.cc"
     $<TARGET_OBJECTS:tf_contrib_boosted_trees_model_ops>
+    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/split_handler_ops.cc"
+    $<TARGET_OBJECTS:tf_contrib_boosted_trees_split_handler_ops>
+    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/training_ops.cc"
+    $<TARGET_OBJECTS:tf_contrib_boosted_trees_training_ops>
+    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/prediction_ops.cc"
+    $<TARGET_OBJECTS:tf_contrib_boosted_trees_prediction_ops>
+    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/quantile_ops.cc"
+    $<TARGET_OBJECTS:tf_contrib_boosted_trees_quantiles_ops>
+    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/stats_accumulator_ops.cc"
+    $<TARGET_OBJECTS:tf_contrib_boosted_trees_stats_accumulator_ops>
 )
 
-AddUserOps(TARGET boosted_trees_model_ops
-    SOURCES "${tf_boosted_trees_model_srcs}"
+AddUserOps(TARGET boosted_trees_ops
+    SOURCES "${tf_boosted_trees_srcs}"
     DEPENDS tf_contrib_boosted_trees_model_ops
     LIBS tensorflow_contrib_protos boosted_trees_utils
 )
 
-set(tf_boosted_trees_split_handler_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/split_handler_ops.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/learner/stochastic/handlers/bias-feature-column-handler.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/learner/stochastic/handlers/categorical-feature-column-handler.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/learner/stochastic/handlers/dense-quantized-feature-column-handler.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/learner/stochastic/handlers/sparse-quantized-feature-column-handler.cc"
-    $<TARGET_OBJECTS:tf_contrib_boosted_trees_split_handler_ops>
-)
-
-AddUserOps(TARGET boosted_trees_split_handler_ops
-    SOURCES "${tf_boosted_trees_split_handler_srcs}"
-    DEPENDS tf_contrib_boosted_trees_split_handler_ops
-    LIBS tensorflow_contrib_protos)
-
-set(tf_boosted_trees_training_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/training_ops.cc"
-    $<TARGET_OBJECTS:tf_contrib_boosted_trees_training_ops>
-)
-
-AddUserOps(TARGET boosted_trees_training_ops
-    SOURCES "${tf_boosted_trees_training_srcs}"
-    DEPENDS tf_contrib_boosted_trees_training_ops
-    LIBS tensorflow_contrib_protos boosted_trees_utils)
-
-set(tf_boosted_trees_prediction_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/prediction_ops.cc"
-    $<TARGET_OBJECTS:tf_contrib_boosted_trees_prediction_ops>
-)
-
-AddUserOps(TARGET boosted_trees_prediction_ops
-    SOURCES "${tf_boosted_trees_prediction_srcs}"
-    DEPENDS tf_contrib_boosted_trees_prediction_ops
-    LIBS tensorflow_contrib_protos boosted_trees_utils)
-
-set(tf_boosted_trees_quantile_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/quantile_ops.cc"
-    $<TARGET_OBJECTS:tf_contrib_boosted_trees_quantiles_ops>
-)
-AddUserOps(TARGET boosted_trees_quantile_ops
-    SOURCES "${tf_boosted_trees_quantile_srcs}"
-    DEPENDS tf_contrib_boosted_trees_quantiles_ops
-    LIBS tensorflow_contrib_protos boosted_trees_utils
-)
-set(tf_boosted_trees_stats_accumulator_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/stats_accumulator_ops.cc"
-    $<TARGET_OBJECTS:tf_contrib_boosted_trees_stats_accumulator_ops>
-)
-AddUserOps(TARGET boosted_trees_stats_accumulator_ops
-    SOURCES "${tf_boosted_trees_stats_accumulator_srcs}"
-    DEPENDS tf_contrib_boosted_trees_stats_accumulator_ops
-    LIBS tensorflow_contrib_protos boosted_trees_utils
-)
-set(tf_batch_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/batching/util/periodic_function.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/batching/kernels/batch_kernels.cc"
-    $<TARGET_OBJECTS:tf_contrib_batch_ops>
-)
-AddUserOps(TARGET batch_ops
-    SOURCES "${tf_batch_srcs}"
-    DEPENDS tf_contrib_batch_ops)
-
-#install(TARGETS ${tf_contrib_ops}
-#    EXPORT TensorflowContribTargets
-#    LIBRARY DESTINATION "lib/tensorflow/contrib")
+#set(tf_batch_srcs
+#    "${tensorflow_source_dir}/tensorflow/contrib/batching/util/periodic_function.cc"
+#    "${tensorflow_source_dir}/tensorflow/contrib/batching/kernels/batch_kernels.cc"
+#    $<TARGET_OBJECTS:tf_contrib_batch_ops>
+#)
+#AddUserOps(TARGET batch_ops
+#    SOURCES "${tf_batch_srcs}"
+#    DEPENDS tf_contrib_batch_ops)
+#
 
 # Create TensorflowConfig.cmake
 EXPORT(TARGETS ${tf_contrib_ops} FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowContribTargets.cmake")

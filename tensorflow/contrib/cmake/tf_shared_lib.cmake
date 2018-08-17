@@ -73,7 +73,7 @@ add_library(tensorflow_core_lib STATIC
 )
 add_dependencies(tensorflow_core_lib tf_core_lib tf_core_framework)
 list(APPEND tensorflow_libs tensorflow_core_lib)
-list(APPEND tensorflow_libs tensorflow_protos)
+#list(APPEND tensorflow_libs tensorflow_protos)
 add_library(tensorflow_framework SHARED
     $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
     $<TARGET_OBJECTS:tf_c>
@@ -122,10 +122,9 @@ else()
       ${tensorflow_deffile}
   )
 endif()
-)
 set_target_properties(tensorflow PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
-    SOVERSION ${TENSORFLOW_LIB_SOVERSION}
+    SOVERSION ${TENSORFLOW_LIB_SOVERSION})
 
 target_link_libraries(tensorflow PUBLIC tensorflow_framework)
 target_link_libraries(tensorflow PRIVATE
@@ -138,7 +137,12 @@ target_include_directories(tensorflow PUBLIC
   $<INSTALL_INTERFACE:include/tensorflow/c>  # <prefix>/include/tensorflow/c
 )
 set_target_properties(tensorflow PROPERTIES PUBLIC_HEADER "${tensorflow_source_dir}/tensorflow/c/c_api.h")
-list(APPEND tensorflow_libs tensorflow)
+install(TARGETS tensorflow
+    EXPORT TensorflowTargets
+    LIBRARY DESTINATION "lib${LIBSUFFIX}"
+    ARCHIVE DESTINATION "lib${LIBSUFFIX}"
+    INCLUDES DESTINATION include/tensorflow/c
+    PUBLIC_HEADER DESTINATION "include/tensorflow/c")
 
 install(TARGETS ${tensorflow_libs}
     EXPORT TensorflowTargets
@@ -147,7 +151,7 @@ install(TARGETS ${tensorflow_libs}
     PUBLIC_HEADER DESTINATION "include/tensorflow/c")
 
 # Create TensorflowConfig.cmake
-EXPORT(TARGETS ${tensorflow_libs} FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowTargets.cmake")
+EXPORT(TARGETS ${tensorflow_libs} tensorflow_protos tensorflow_text_protos FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowTargets.cmake")
 INSTALL(EXPORT TensorflowTargets DESTINATION "share/tensorflow/cmake")
 
 # There is a bug in GCC 5 resulting in undefined reference to a __cpu_model function when

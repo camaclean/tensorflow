@@ -290,9 +290,10 @@ include_directories(
     #${ZLIB_INCLUDE_DIRS}
     ${GIF_INCLUDE_DIR}
     ${JPEG_INCLUDE_DIR}
+    $<TARGET_PROPERTY:Eigen3::Eigen,INTERFACE_INCLUDE_DIRECTORIES>
     #${EIGEN3_INCLUDE_DIRS}
     ${gemmlowp_INCLUDE_DIR}
-    "${jsoncpp_INCLUDE_DIR}/include"
+    "${jsoncpp_INCLUDE_DIR}"
     ${farmhash_INCLUDE_DIR}
     ${HIGHWAYHASH_INCLUDE_DIR}
     ${cub_INCLUDE_DIR}

@@ -51,6 +51,7 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
+set(GRPC_BUILD "/mnt/bwpy/single/usr/bin")
 if(NOT WIN32)
   function(RELATIVE_PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS ROOT_DIR)
     if(NOT ARGN)
