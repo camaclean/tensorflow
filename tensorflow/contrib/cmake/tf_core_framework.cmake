@@ -132,6 +132,7 @@ file(GLOB_RECURSE tf_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
     "${tensorflow_source_dir}/tensorflow/compiler/xla/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/proto/*.proto"
     "${tensorflow_source_dir}/tensorflow/contrib/tpu/proto/*.proto"
+    "${tensorflow_source_dir}/tensorflow/python/framework/*.proto"
 )
 
 RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
@@ -202,7 +203,9 @@ if(tensorflow_ENABLE_GRPC_SUPPORT)
     $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
   )
   target_link_libraries(tensorflow_protos gRPC::grpc_unsecure gRPC::grpc++_unsecure)
-  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER ${PROTO_HDRS} ${PROTO_GRPC_HDRS} ${PROTO_TEXT_HDRS})
+  list(APPEND TENSORFLOW_INSTALL_PROTO_HDRS ${PROTO_HDRS} ${PROTO_GRPC_HDRS} ${PROTO_TEXT_HDRS})
+  message("${TENSORFLOW_INSTALL_PROTO_HDRS}")
+  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER "${TENSORFLOW_INSTALL_PROTO_HDRS}")
 else()
   add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})
   target_include_directories(tensorflow_protos INTERFACE 

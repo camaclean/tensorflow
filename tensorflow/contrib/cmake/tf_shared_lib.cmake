@@ -126,7 +126,7 @@ set_target_properties(tensorflow PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
     SOVERSION ${TENSORFLOW_LIB_SOVERSION})
 
-target_link_libraries(tensorflow PUBLIC tensorflow_framework)
+target_link_libraries(tensorflow PUBLIC tensorflow_framework tensorflow_text_protos)
 target_link_libraries(tensorflow PRIVATE
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
@@ -136,7 +136,8 @@ target_include_directories(tensorflow PUBLIC
   $<BUILD_INTERFACE:${tensorflow_source_dir}/tensorflow/c>
   $<INSTALL_INTERFACE:include/tensorflow/c>  # <prefix>/include/tensorflow/c
 )
-set_target_properties(tensorflow PROPERTIES PUBLIC_HEADER "${tensorflow_source_dir}/tensorflow/c/c_api.h")
+set_target_properties(tensorflow PROPERTIES PUBLIC_HEADER 
+  "${tensorflow_source_dir}/tensorflow/c/python_api.h;${tensorflow_source_dir}/tensorflow/c/c_api.h")
 install(TARGETS tensorflow
     EXPORT TensorflowTargets
     LIBRARY DESTINATION "lib${LIBSUFFIX}"
@@ -194,24 +195,3 @@ install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/core/
 install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
         DESTINATION include/tensorflow/stream_executor
         FILES_MATCHING PATTERN "*.h")
-# google protobuf headers
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/protobuf/src/protobuf/src/google/
-        DESTINATION include/google
-        FILES_MATCHING PATTERN "*.h")
-# Eigen directory
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/Eigen/
-        DESTINATION include/Eigen)
-# external directory
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/external/eigen_archive/
-        DESTINATION include/external/eigen_archive)
-# third_party eigen directory
-install(DIRECTORY ${tensorflow_source_dir}/third_party/eigen3/
-        DESTINATION include/third_party/eigen3)
-# unsupported Eigen directory
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/eigen/src/eigen/unsupported/Eigen/
-        DESTINATION include/unsupported/Eigen)
-# mkl
-if (tensorflow_ENABLE_MKL_SUPPORT)
-    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/mkl/src/mkl/include/
-            DESTINATION include/mkl)
-endif (tensorflow_ENABLE_MKL_SUPPORT)
