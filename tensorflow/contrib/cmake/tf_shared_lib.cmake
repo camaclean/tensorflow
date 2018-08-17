@@ -77,7 +77,7 @@ list(APPEND tensorflow_libs tensorflow_core_lib)
 add_library(tensorflow_framework SHARED
     $<$<BOOL:${tensorflow_ENABLE_GPU}>:$<TARGET_OBJECTS:tf_stream_executor>>
     $<TARGET_OBJECTS:tf_c>
-    $<TARGET_OBJECTS:tf_c_python_api>
+#    $<TARGET_OBJECTS:tf_c_python_api> #may depend on version specfic stuff
     $<TARGET_OBJECTS:tf_core_lib>
     $<TARGET_OBJECTS:tf_core_cpu>
     $<TARGET_OBJECTS:tf_cc_framework>

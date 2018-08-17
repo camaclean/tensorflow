@@ -184,11 +184,11 @@ add_library(tensorflow_text_protos SHARED ${PROTO_TEXT_SRCS})
 target_include_directories(tensorflow_text_protos INTERFACE
   $<INSTALL_INTERFACE:include/tensorflow/protos>
 )
-set_target_properties(tensorflow_text_protos PROPERTIES PUBLIC_HEADER ${PROTO_TEXT_HDRS})
+#set_target_properties(tensorflow_text_protos PROPERTIES PUBLIC_HEADER ${PROTO_TEXT_HDRS})
 install(TARGETS tensorflow_text_protos
   EXPORT TensorflowTargets
   LIBRARY DESTINATION "lib${LIBSUFFIX}"
-  PUBLIC_HEADER DESTINATION "include/tensorflow/protos")
+#  PUBLIC_HEADER DESTINATION "include/tensorflow/protos")
 add_dependencies(tensorflow_text_protos proto_text)
 
 if(tensorflow_ENABLE_GRPC_SUPPORT)
@@ -199,19 +199,18 @@ if(tensorflow_ENABLE_GRPC_SUPPORT)
       ${tensorflow_source_dir} ${tf_protos_grpc_cc_srcs}
   )
   add_library(tensorflow_protos SHARED ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_SRCS} ${PROTO_HDRS})
-  target_include_directories(tensorflow_protos INTERFACE 
-    $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
-  )
   target_link_libraries(tensorflow_protos gRPC::grpc_unsecure gRPC::grpc++_unsecure)
-  list(APPEND TENSORFLOW_INSTALL_PROTO_HDRS ${PROTO_HDRS} ${PROTO_GRPC_HDRS} ${PROTO_TEXT_HDRS})
-  message("${TENSORFLOW_INSTALL_PROTO_HDRS}")
-  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER "${TENSORFLOW_INSTALL_PROTO_HDRS}")
+  #target_include_directories(tensorflow_protos INTERFACE 
+  #  $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
+  #)
+  #list(APPEND TENSORFLOW_INSTALL_PROTO_HDRS ${PROTO_HDRS} ${PROTO_GRPC_HDRS} ${PROTO_TEXT_HDRS})
+  #set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER "${TENSORFLOW_INSTALL_PROTO_HDRS}")
 else()
   add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})
-  target_include_directories(tensorflow_protos INTERFACE 
-    $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
-  )
-  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER ${PROTO_HDRS} ${PROTO_TEXT_HDRS})
+  #target_include_directories(tensorflow_protos INTERFACE 
+  #  $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
+  #)
+  #set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER ${PROTO_HDRS} ${PROTO_TEXT_HDRS})
 endif()
 set_target_properties(tensorflow_protos PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
