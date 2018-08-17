@@ -178,9 +178,18 @@ RELATIVE_PROTOBUF_TEXT_GENERATE_CPP(PROTO_TEXT_SRCS PROTO_TEXT_HDRS
     ${tensorflow_source_dir} ${tf_proto_text_srcs}
 )
 
-if(WIN32)
-  add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})
-else()
+add_library(tensorflow_text_protos SHARED ${PROTO_TEXT_SRCS})
+target_include_directories(tensorflow_text_protos INTERFACE
+  $<INSTALL_INTERFACE:include/tensorflow/protos>
+)
+set_target_properties(tensorflow_text_protos PROPERTIES PUBLIC_HEADER ${PROTO_TEXT_HDRS})
+install(TARGETS tensorflow_text_protos
+  EXPORT TensorflowTargets
+  LIBRARY DESTINATION "lib${LIBSUFFIX}"
+  PUBLIC_HEADER DESTINATION "include/tensorflow/protos")
+add_dependencies(tensorflow_text_protos proto_text)
+
+if(tensorflow_ENABLE_GRPC_SUPPORT)
   file(GLOB_RECURSE tf_protos_grpc_cc_srcs RELATIVE ${tensorflow_source_dir}
       "${tensorflow_source_dir}/tensorflow/core/debug/*.proto"
   )
@@ -188,12 +197,26 @@ else()
       ${tensorflow_source_dir} ${tf_protos_grpc_cc_srcs}
   )
   add_library(tensorflow_protos SHARED ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_SRCS} ${PROTO_HDRS})
+  target_include_directories(tensorflow_protos INTERFACE 
+    $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
+  )
   target_link_libraries(tensorflow_protos gRPC::grpc_unsecure gRPC::grpc++_unsecure)
+  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER ${PROTO_HDRS} ${PROTO_GRPC_HDRS} ${PROTO_TEXT_HDRS})
+else()
+  add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})
+  target_include_directories(tensorflow_protos INTERFACE 
+    $<INSTALL_INTERFACE:include/tensorflow/protos>  # <prefix>/include/tensorflow
+  )
+  set_target_properties(tensorflow_protos PROPERTIES PUBLIC_HEADER ${PROTO_HDRS} ${PROTO_TEXT_HDRS})
 endif()
 set_target_properties(tensorflow_protos PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
     SOVERSION ${TENSORFLOW_LIB_SOVERSION}
 )
+install(TARGETS tensorflow_protos
+    EXPORT TensorflowTargets
+    LIBRARY DESTINATION "lib${LIBSUFFIX}"
+    PUBLIC_HEADER DESTINATION "include/tensorflow/protos")
 
 ########################################################
 # tf_core_lib library
@@ -326,10 +349,8 @@ list(REMOVE_ITEM tf_core_framework_srcs ${tf_core_framework_exclude_srcs})
 
 add_library(tf_core_framework OBJECT
     ${tf_core_framework_srcs}
-    ${tf_version_srcs}
-    ${PROTO_TEXT_HDRS}
-    ${PROTO_TEXT_SRCS})
+    ${tf_version_srcs})
 add_dependencies(tf_core_framework
     tf_core_lib
-    proto_text
+    tensorflow_text_protos
 )

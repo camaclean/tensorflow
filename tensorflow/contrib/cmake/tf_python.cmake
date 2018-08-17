@@ -178,66 +178,6 @@ add_custom_target(tf_python_touchup_modules)
 add_custom_target(tf_python_copy_scripts_to_destination DEPENDS tf_python_touchup_modules)
 
 
-# tf_python_srcs contains all static .py files
-function(add_python_module MODULE_NAME)
-    set(options DONTCOPY)
-    cmake_parse_arguments(ADD_PYTHON_MODULE "${options}" "" "" ${ARGN})
-    add_custom_command(TARGET tf_python_touchup_modules PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${MODULE_NAME}")
-    add_custom_command(TARGET tf_python_touchup_modules PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E touch "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${MODULE_NAME}/__init__.py")
-    file(GLOB module_python_srcs RELATIVE ${tensorflow_source_dir}
-        "${tensorflow_source_dir}/${MODULE_NAME}/*.py"
-    )
-    if(NOT ${ADD_PYTHON_MODULE_DONTCOPY})
-        foreach(script ${module_python_srcs})
-            get_filename_component(REL_DIR ${script} DIRECTORY)
-            # NOTE(mrry): This rule may exclude modules that should be part of
-            # the distributed PIP package
-            # (e.g. tensorflow/contrib/testing/python/framework/util_test.py),
-            # so we currently add explicit commands to include those files
-            # later on in this script.
-            if (NOT "${script}" MATCHES "_test\.py$")
-	        add_custom_command(TARGET tf_python_copy_scripts_to_destination PRE_BUILD
-                  COMMAND ${CMAKE_COMMAND} -E copy ${tensorflow_source_dir}/${script} ${CMAKE_CURRENT_BINARY_DIR}/tf_python/${script})
-            endif()
-        endforeach()
-    endif()
-endfunction()
-
-FILE(READ python_modules.txt python_modules)
-# Convert file contents into a CMake list (where each element in the list is one line of the file)
-STRING(REGEX REPLACE ";" "\\\\;" python_modules "${python_modules}")
-STRING(REGEX REPLACE "\n" ";" python_modules "${python_modules}")
-
-foreach(python_module ${python_modules})
-  if(NOT python_module MATCHES "^\#")
-    STRING(REGEX REPLACE " *\#.*" "" python_module "${python_module}")
-    if(NOT EXISTS "${tensorflow_source_dir}/${python_module}")
-      message(SEND_ERROR "Python module not found: ${python_module}")
-    endif()
-    add_python_module(${python_module})
-  endif()
-endforeach(python_module)
-
-add_custom_command(TARGET tf_python_touchup_modules PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-    "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/lite")
-add_custom_command(TARGET tf_python_touchup_modules PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-    "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/lite/python")
-add_custom_command(TARGET tf_python_touchup_modules PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E touch
-    "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/lite/python/__init__.py")
-add_custom_command(
-    TARGET tf_python_copy_scripts_to_destination PRE_BUILD
-    COMMAND ${CMAKE_COMMAND} -E touch
-    ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/lite/python/lite.py)
-
-# Generate the tensorflow.python.platform.build_info module.
-set(BUILD_INFO_PY "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/platform/build_info.py")
-add_custom_command(TARGET tf_python_copy_scripts_to_destination PRE_BUILD
-  COMMAND ${PYTHON_EXECUTABLE} ${tensorflow_source_dir}/tensorflow/tools/build_info/gen_build_info.py --raw_generate ${BUILD_INFO_PY} ${tensorflow_BUILD_INFO_FLAGS})
 
 
 ########################################################

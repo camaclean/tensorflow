@@ -90,6 +90,7 @@ set_target_properties(tensorflow_framework PROPERTIES
 target_link_libraries(tensorflow_framework PRIVATE
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
+    tensorflow_text_protos
     tensorflow_protos)
 list(APPEND tensorflow_libs tensorflow_framework)
 
