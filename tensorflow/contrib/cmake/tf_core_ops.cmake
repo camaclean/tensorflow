@@ -164,22 +164,91 @@ file(GLOB_RECURSE tf_contrib_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
 #add_library(tensor_forest_protos SHARED ${T_F_PROTO_SRCS} ${T_F_PROTO_HDRS})
 #target_link_libraries(tensor_forest_protos decision_trees_protos)
 
-RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
+RELATIVE_PROTOBUF_GENERATE_CPP(CONTRIB_PROTO_SRCS CONTRIB_PROTO_HDRS
     ${tensorflow_source_dir} ${tf_contrib_protos_cc_srcs}
 )
 
-add_library(tensorflow_contrib_protos SHARED ${PROTO_SRCS} ${PROTO_HDRS})
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/boosted_trees/proto
+        DESTINATION include/tensorflow/contrib/boosted_trees
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/resources
+        DESTINATION include/tensorflow/contrib/boosted_trees
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/utils
+        DESTINATION include/tensorflow/contrib/boosted_trees
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/trees
+        DESTINATION include/tensorflow/contrib/boosted_trees
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/quantiles
+        DESTINATION include/tensorflow/contrib/boosted_trees/lib
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/models
+        DESTINATION include/tensorflow/contrib/boosted_trees/lib
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/lib/learner
+        DESTINATION include/tensorflow/contrib/boosted_trees/lib
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/decision_trees/proto
+        DESTINATION include/tensorflow/contrib/decision_trees
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/tensor_forest/proto
+        DESTINATION include/tensorflow/contrib/tensor_forest
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tensor_forest/kernels
+        DESTINATION include/tensorflow/contrib/tensor_forest
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tensor_forest/kernels/v4
+        DESTINATION include/tensorflow/contrib/tensor_forest/kernels
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tensor_forest/hybrid/core/ops
+        DESTINATION include/tensorflow/contrib/tensor_forest/hybrid/core
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/session_bundle
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/session_bundle
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tensorboard/db
+        DESTINATION include/tensorflow/contrib/tensorboard
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/tensorboard
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tpu/profiler
+        DESTINATION include/tensorflow/contrib/tpu
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/tpu/profiler
+        DESTINATION include/tensorflow/contrib/tpu
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/training
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/mpi
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/mpi
+        DESTINATION include/tensorflow/contrib
+        FILES_MATCHING PATTERN "*.h")
+
+add_library(tensorflow_contrib_protos SHARED ${CONTRIB_PROTO_SRCS} ${CONTRIB_PROTO_HDRS})
 set_target_properties(tensorflow_contrib_protos PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
     SOVERSION ${TENSORFLOW_LIB_SOVERSION}
-#    PUBLIC_HEADER "${PROTO_HDRS}"
 )
-add_dependencies(tensorflow_contrib_protos tensorflow_protos)
-list(APPEND tf_contrib_ops tensorflow_contrib_protos)
+target_link_libraries(tensorflow_contrib_protos tensorflow_protos)
+#list(APPEND tf_contrib_ops tensorflow_contrib_protos)
 install(TARGETS tensorflow_contrib_protos
     EXPORT TensorflowContribTargets
-    LIBRARY DESTINATION "lib${LIBSUFFIX}/tensorflow/contrib"
-#    PUBLIC_HEADER DESTINATION "include/tensorflow/contrib/proto"
+    LIBRARY DESTINATION "lib${LIBSUFFIX}"
 )
 
 set(tf_op_lib_names
@@ -599,7 +668,7 @@ AddUserOps(TARGET boosted_trees_ops
 #
 
 # Create TensorflowConfig.cmake
-EXPORT(TARGETS ${tf_contrib_ops} FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowContribTargets.cmake")
+EXPORT(TARGETS ${tf_contrib_ops} tensorflow_contrib_protos FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowContribTargets.cmake")
 INSTALL(EXPORT TensorflowContribTargets DESTINATION "share/tensorflow/cmake")
 
 ########################################################

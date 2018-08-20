@@ -167,7 +167,7 @@ if(WIN32)
 endif(WIN32)
 
 target_include_directories(tensorflow PUBLIC 
-    $<INSTALL_INTERFACE:include/>)
+    $<INSTALL_INTERFACE:include>)
 
 install(TARGETS tensorflow EXPORT tensorflow_export
         RUNTIME DESTINATION bin
@@ -191,6 +191,12 @@ install(DIRECTORY ${tensorflow_source_dir}/tensorflow/core/
         FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/core/
         DESTINATION include/tensorflow/core
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/core/lib/strings
+        DESTINATION include/tensorflow/core/lib
+        FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${tensorflow_source_dir}/tensorflow/core/lib/graph
+        DESTINATION include/tensorflow/core/lib
         FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
         DESTINATION include/tensorflow/stream_executor

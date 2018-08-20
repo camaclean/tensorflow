@@ -182,7 +182,7 @@ RELATIVE_PROTOBUF_TEXT_GENERATE_CPP(PROTO_TEXT_SRCS PROTO_TEXT_HDRS
 
 add_library(tensorflow_text_protos SHARED ${PROTO_TEXT_SRCS})
 target_include_directories(tensorflow_text_protos INTERFACE
-  $<INSTALL_INTERFACE:include/tensorflow/protos>
+  $<INSTALL_INTERFACE:include>
 )
 install(TARGETS tensorflow_text_protos
   EXPORT TensorflowTargets
@@ -217,6 +217,7 @@ install(TARGETS tensorflow_protos
 file(GLOB_RECURSE tf_core_lib_srcs
     "${tensorflow_source_dir}/tensorflow/core/lib/*.h"
     "${tensorflow_source_dir}/tensorflow/core/lib/*.cc"
+    "${tensorflow_source_dir}/tensorflow/core/lib/*/*.cc"
     "${tensorflow_source_dir}/tensorflow/core/public/*.h"
 )
 
