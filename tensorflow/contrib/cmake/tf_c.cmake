@@ -36,13 +36,3 @@ add_dependencies(
   tf_cc_while_loop
   tf_core_lib
   tensorflow_protos)
-
-add_library(tf_c_python_api OBJECT
-  "${tensorflow_source_dir}/tensorflow/c/python_api.cc"
-  "${tensorflow_source_dir}/tensorflow/c/python_api.h"
-)
-add_dependencies(
-  tf_c_python_api
-  tf_c
-  tf_core_lib
-  tensorflow_protos)

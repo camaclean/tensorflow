@@ -804,6 +804,15 @@ add_dependencies(tf_python_copy_scripts_to_destination
     python_library_symlinks
 )
 
+#add_library(tf_c_python_api SHARED
+#  "${tensorflow_source_dir}/tensorflow/c/python_api.cc"
+#  "${tensorflow_source_dir}/tensorflow/c/python_api.h"
+#)
+#add_dependencies(
+#  tf_c_python_api
+#  tf_c
+#  tf_core_lib
+#  tensorflow_protos)
 
 # Fix-up Python files that were not included by the add_python_module() macros.
 add_custom_command(TARGET tf_python_build_pip_package POST_BUILD

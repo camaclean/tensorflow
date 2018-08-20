@@ -603,14 +603,3 @@ EXPORT(PACKAGE Tensorflow)
 SET(TENSORFLOW_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include/tensorflow")
 CONFIGURE_FILE(TensorflowConfig.cmake.in "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake")
 INSTALL(FILES "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake" DESTINATION "share/tensorflow/cmake")
-
-MESSAGE(STATUS "<<< Gentoo configuration >>>
-Build type      ${CMAKE_BUILD_TYPE}
-Install path    ${CMAKE_INSTALL_PREFIX}
-Compiler flags:
-C               ${CMAKE_C_FLAGS}
-C++             ${CMAKE_CXX_FLAGS}
-Linker flags:
-Executable      ${CMAKE_EXE_LINKER_FLAGS}
-Module          ${CMAKE_MODULE_LINKER_FLAGS}
-Shared          ${CMAKE_SHARED_LINKER_FLAGS}\n")

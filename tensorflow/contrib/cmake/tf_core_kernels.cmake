@@ -40,6 +40,12 @@ else(tensorflow_BUILD_ALL_KERNELS)
   )
 endif(tensorflow_BUILD_ALL_KERNELS)
 
+file(GLOB_RECURSE tf_mkl_srcs
+  "${tensorflow_source_dir}/tensorflow/core/kernels/mkl_*.cc")
+set_source_files_properties(
+  ${tf_mkl_srcs}
+  PROPERTIES COMPILE_FLAGS -fexceptions)
+
 if(tensorflow_BUILD_CONTRIB_KERNELS AND WIN32)
   set(tf_contrib_kernels_srcs
       "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/kernels/model_ops.cc"
