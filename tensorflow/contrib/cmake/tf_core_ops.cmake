@@ -332,6 +332,7 @@ GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_training "${tensorflow_source_dir}/ten
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_prediction "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/prediction_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_quantiles "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/quantile_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_stats_accumulator "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/stats_accumulator_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(bigtable "${tensorflow_source_dir}/tensorflow/contrib/bigtable/ops/bigtable_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(coder "${tensorflow_source_dir}/tensorflow/contrib/coder/ops/coder_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(data_dataset "${tensorflow_source_dir}/tensorflow/contrib/data/ops/dataset_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(factorization_clustering "${tensorflow_source_dir}/tensorflow/contrib/factorization/ops/clustering_ops.cc")
@@ -423,8 +424,13 @@ set(distort_image_ops_srcs
     $<TARGET_OBJECTS:tf_contrib_image_distort_image_ops>
 )
 
+set(distort_image_ops_gpu_srcs
+    "${tensorflow_source_dir}/tensorflow/contrib/image/kernels/adjust_hsv_in_yiq_op_gpu.cu.cc"
+)
+
 AddUserOps(TARGET distort_image_ops
     SOURCES "${distort_image_ops_srcs}"
+    GPUSOURCES "${distort_image_ops_gpu_srcs}"
     DEPENDS tf_contrib_image_distort_image_ops)
 
 AddUserOps(TARGET tpu_ops
@@ -660,15 +666,62 @@ AddUserOps(TARGET boosted_trees_ops
     LIBS tensorflow_contrib_protos boosted_trees_utils
 )
 
-#set(tf_batch_srcs
-#    "${tensorflow_source_dir}/tensorflow/contrib/batching/util/periodic_function.cc"
-#    "${tensorflow_source_dir}/tensorflow/contrib/batching/kernels/batch_kernels.cc"
-#    $<TARGET_OBJECTS:tf_contrib_batch_ops>
-#)
-#AddUserOps(TARGET batch_ops
-#    SOURCES "${tf_batch_srcs}"
-#    DEPENDS tf_contrib_batch_ops)
-#
+set(tf_bigtable_srcs
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_scan_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_sample_keys_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_sample_key_pairs_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_key_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_helpers_test.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_helpers.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_prefix_key_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_lookup_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_lib.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_kernels.cc"
+    $<TARGET_OBJECTS:tf_contrib_bigtable_ops>
+)
+
+AddUserOps(TARGET bigtable_ops
+    SOURCES "${tf_bigtable_srcs}"
+    DEPENDS tf_contrib_bigtable_ops
+    LIBS bigtable_client bigtable_protos) # whole-archive protos?
+
+set(tf_coder_srcs
+    "${tensorflow_source_dir}/tensorflow/contrib/coder/kernels/range_coder_ops_util.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/coder/kernels/range_coder_ops.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/coder/kernels/range_coder.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/coder/kernels/pmf_to_cdf_op.cc"
+    $<TARGET_OBJECTS:tf_contrib_coder_ops>
+)
+
+AddUserOps(TARGET coder_ops
+    SOURCES "${tf_coder_srcs}"
+    DEPENDS tf_contrib_coder_ops
+)
+
+set(tf_dataset_srcs
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/unique_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/threadpool_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/prefetching_kernels.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/ignore_errors_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/directed_interleave_dataset_op.cc"
+    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/csv_dataset_op.cc"
+    $<TARGET_OBJECTS:tf_contrib_data_dataset_ops>
+)
+
+AddUserOps(TARGET dataset_ops
+    SOURCES "${tf_dataset_srcs}"
+    DEPENDS tf_contrib_data_dataset_ops
+)
+
+set(tf_periodic_resample_srcs
+    "${tensorflow_source_dir}/tensorflow/contrib/periodic_resample/kernels/periodic_resample_op.cc"
+    $<TARGET_OBJECTS:tf_contrib_periodic_resample_ops>
+)
+
+AddUserOps(TARGET periodic_resample
+    SOURCES "${tf_periodic_resample_srcs}"
+    DEPENDS tf_contrib_periodic_resample_ops
+)
 
 # Create TensorflowConfig.cmake
 EXPORT(TARGETS ${tf_contrib_ops} tensorflow_contrib_protos FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowContribTargets.cmake")
