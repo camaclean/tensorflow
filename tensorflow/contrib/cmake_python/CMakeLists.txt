@@ -381,7 +381,7 @@ function(PYTHON_SYMLINK_CUSTOM_OPS_LIB TGT LOC LIBNAME)
   add_custom_command(OUTPUT "${LOC}/${LIBNAME}"
                      COMMAND ${CMAKE_COMMAND} -E create_symlink ${${TGT}_lib_location} "${LOC}/${LIBNAME}"
                      DEPENDS ${TGT}
-                     COMMENT "Installing contrib library symlink ${LOC}/${LIBNAME}")
+                     COMMENT "Installing contrib library symlink ${LOC}/${LIBNAME} ${${TGT}_lib_location}")
 
   add_custom_target(${TGT}_python_symlink ALL DEPENDS "${LOC}/${LIBNAME}")
   add_dependencies(python_library_symlinks ${TGT}_python_symlink)
@@ -542,6 +542,8 @@ GENERATE_PYTHON_OP_LIB("user_ops")
 GENERATE_PYTHON_OP_LIB("training_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/training/gen_training_ops.py)
 
+GENERATE_PYTHON_OP_LIB("contrib_tpu_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/ops/gen_tpu_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_model_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_model_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_split_handler_ops"
@@ -638,6 +640,9 @@ PYTHON_SYMLINK_CUSTOM_OPS_LIB(nccl_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/te
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(sparse_feature_cross_op "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/layers/python/ops/" "_sparse_feature_cross_op.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(gru_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/" "_gru_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(lstm_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/" "_lstm_ops.so")
+PYTHON_SYMLINK_CUSTOM_OPS_LIB(coder_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/coder/python/ops/" "_coder_ops.so")
+PYTHON_SYMLINK_CUSTOM_OPS_LIB(dataset_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/data/" "_dataset_ops.so")
+PYTHON_SYMLINK_CUSTOM_OPS_LIB(periodic_resample "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/periodic_resample/python/ops/" "_periodic_resample_op.so")
 
 find_package(SWIG REQUIRED)
 # Generate the C++ and Python source code for the SWIG wrapper.
