@@ -70,7 +70,7 @@ foreach(tf_cc_op_lib_name ${tf_cc_op_lib_names})
 
     target_link_libraries(${tf_cc_op_lib_name}_gen_cc PRIVATE
         tensorflow_protos
-	tensorflow_text_protos
+	#tensorflow_text_protos
         ${tensorflow_EXTERNAL_LIBRARIES}
         ${MKL_LIBRARIES}
     )

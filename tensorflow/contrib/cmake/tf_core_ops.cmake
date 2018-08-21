@@ -227,6 +227,9 @@ install(DIRECTORY ${tensorflow_source_dir}/tensorflow/contrib/tpu/profiler
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/tpu/profiler
         DESTINATION include/tensorflow/contrib/tpu
         FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/contrib/tpu/proto
+        DESTINATION include/tensorflow/contrib/tpu
+        FILES_MATCHING PATTERN "*.h")
 
 install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/tensorflow/training
         DESTINATION include/tensorflow/contrib

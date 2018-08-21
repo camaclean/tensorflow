@@ -23,7 +23,7 @@ limitations under the License.
 #include <locale>
 #include <unordered_map>
 
-#include "double-conversion/double-conversion.h"
+#include "double-conversion-tf/double-conversion.h"
 
 #include "tensorflow/core/lib/strings/str_util.h"
 #include "tensorflow/core/lib/strings/stringprintf.h"

@@ -180,15 +180,15 @@ RELATIVE_PROTOBUF_TEXT_GENERATE_CPP(PROTO_TEXT_SRCS PROTO_TEXT_HDRS
     ${tensorflow_source_dir} ${tf_proto_text_srcs}
 )
 
-add_library(tensorflow_text_protos SHARED ${PROTO_TEXT_SRCS})
-target_include_directories(tensorflow_text_protos INTERFACE
-  $<INSTALL_INTERFACE:include>
-)
-install(TARGETS tensorflow_text_protos
-  EXPORT TensorflowTargets
-  LIBRARY DESTINATION "lib${LIBSUFFIX}"
-)
-add_dependencies(tensorflow_text_protos proto_text)
+#add_library(tensorflow_text_protos SHARED ${PROTO_TEXT_SRCS})
+#target_include_directories(tensorflow_text_protos INTERFACE
+#  $<INSTALL_INTERFACE:include>
+#)
+#install(TARGETS tensorflow_text_protos
+#  EXPORT TensorflowTargets
+#  LIBRARY DESTINATION "lib${LIBSUFFIX}"
+#)
+#add_dependencies(tensorflow_text_protos proto_text)
 
 if(tensorflow_ENABLE_GRPC_SUPPORT)
   file(GLOB_RECURSE tf_protos_grpc_cc_srcs RELATIVE ${tensorflow_source_dir}
@@ -343,8 +343,10 @@ list(REMOVE_ITEM tf_core_framework_srcs ${tf_core_framework_exclude_srcs})
 
 add_library(tf_core_framework OBJECT
     ${tf_core_framework_srcs}
-    ${tf_version_srcs})
+    ${tf_version_srcs}
+    ${PROTO_TEXT_HDRS}
+    ${PROTO_TEXT_SRCS})
 add_dependencies(tf_core_framework
     tf_core_lib
-    tensorflow_text_protos
+    #tensorflow_text_protos
 )

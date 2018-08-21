@@ -243,7 +243,8 @@ find_package(protobuf REQUIRED)
 pkg_check_modules(RE2 REQUIRED re2)
 include(cub)
 pkg_check_modules(SQLITE REQUIRED sqlite3)
-include(double_conversion)
+#include(double_conversion)
+find_package(double-conversion-tf)
 if (tensorflow_BUILD_CC_TESTS)
   include(googletest)
 endif()
@@ -268,7 +269,8 @@ set(tensorflow_EXTERNAL_LIBRARIES
     ${RE2_LIBRARIES}
     ${SQLITE_LIBRARIES}
     ${MKL_LIBRARIES}
-    ${double_conversion_STATIC_LIBRARIES}
+    #${double_conversion_STATIC_LIBRARIES}
+    double-conversion
 )
 
 set(tensorflow_EXTERNAL_DEPENDENCIES
@@ -276,7 +278,7 @@ set(tensorflow_EXTERNAL_DEPENDENCIES
     gemmlowp
     cub
     fft2d
-    double_conversion
+    #double_conversion
 )
 #get_target_property(JSONCPP_INCLUDE_DIR jsoncpp_lib
 #  INTERFACE_INCLUDE_DIRECTORIES
@@ -303,7 +305,8 @@ include_directories(
     ${RE2_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIRS}
     ${sqlite_INCLUDE_DIR}
-    ${double_conversion_INCLUDE_DIR}
+    #${double_conversion_INCLUDE_DIR}
+    ${double-conversion_INCLUDE_DIRS}
 )
 
 if(tensorflow_ENABLE_GRPC_SUPPORT)
@@ -603,3 +606,14 @@ EXPORT(PACKAGE Tensorflow)
 SET(TENSORFLOW_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include/tensorflow")
 CONFIGURE_FILE(TensorflowConfig.cmake.in "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake")
 INSTALL(FILES "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake" DESTINATION "share/tensorflow/cmake")
+
+MESSAGE(STATUS "<<< Gentoo configuration >>>
+Build type      ${CMAKE_BUILD_TYPE}
+Install path    ${CMAKE_INSTALL_PREFIX}
+Compiler flags:
+C               ${CMAKE_C_FLAGS}
+C++             ${CMAKE_CXX_FLAGS}
+Linker flags:
+Executable      ${CMAKE_EXE_LINKER_FLAGS}
+Module          ${CMAKE_MODULE_LINKER_FLAGS}
+Shared          ${CMAKE_SHARED_LINKER_FLAGS}\n")

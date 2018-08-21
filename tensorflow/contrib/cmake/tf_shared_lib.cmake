@@ -90,7 +90,7 @@ set_target_properties(tensorflow_framework PROPERTIES
 target_link_libraries(tensorflow_framework PRIVATE
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
-    tensorflow_text_protos
+    #tensorflow_text_protos
     tensorflow_protos)
 list(APPEND tensorflow_libs tensorflow_framework)
 
@@ -126,7 +126,7 @@ set_target_properties(tensorflow PROPERTIES
     VERSION ${TENSORFLOW_LIB_VERSION}
     SOVERSION ${TENSORFLOW_LIB_SOVERSION})
 
-target_link_libraries(tensorflow PUBLIC tensorflow_framework tensorflow_text_protos)
+target_link_libraries(tensorflow PUBLIC tensorflow_framework) #tensorflow_text_protos)
 target_link_libraries(tensorflow PRIVATE
     ${tf_core_gpu_kernels_lib}
     ${tensorflow_EXTERNAL_LIBRARIES}
@@ -152,7 +152,11 @@ install(TARGETS ${tensorflow_libs}
     PUBLIC_HEADER DESTINATION "include/tensorflow/c")
 
 # Create TensorflowConfig.cmake
-EXPORT(TARGETS ${tensorflow_libs} tensorflow_protos tensorflow_text_protos FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowTargets.cmake")
+EXPORT(TARGETS 
+  ${tensorflow_libs} 
+  tensorflow_protos 
+  #tensorflow_text_protos
+  FILE "${CMAKE_CURRENT_BINARY_DIR}/TensorflowTargets.cmake")
 INSTALL(EXPORT TensorflowTargets DESTINATION "share/tensorflow/cmake")
 
 # There is a bug in GCC 5 resulting in undefined reference to a __cpu_model function when
@@ -201,3 +205,8 @@ install(DIRECTORY ${tensorflow_source_dir}/tensorflow/core/lib/graph
 install(DIRECTORY ${tensorflow_source_dir}/tensorflow/stream_executor/
         DESTINATION include/tensorflow/stream_executor
         FILES_MATCHING PATTERN "*.h")
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/farmhash/install/include/farmhash.h
+        DESTINATION include/tensorflow)
+install(FILES 
+        ${CMAKE_CURRENT_BINARY_DIR}/farmhash/install/lib/libfarmhash.a
+        DESTINATION lib)
