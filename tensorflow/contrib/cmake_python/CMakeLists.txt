@@ -40,6 +40,7 @@ find_package(jsoncpp REQUIRED)
 find_package(nsync REQUIRED)
 find_package(Snappy REQUIRED)
 find_package(gRPC REQUIRED)
+find_package(double-conversion-tf REQUIRED)
 include(FindPythonInterp)
 
 if(tensorflow_ENABLE_MPI)
@@ -62,38 +63,6 @@ foreach(PROTO_TEXT_CONFIG ${PROTO_TEXT_CONFIGS})
     get_target_property(PROTO_TEXT_EXE proto_text IMPORTED_LOCATION_GENTOO)
   endif()
 endforeach()
-
-#function(RELATIVE_PROTOBUF_TEXT_GENERATE_CPP SRCS HDRS ROOT_DIR)
-#  if(NOT ARGN)
-#      message(SEND_ERROR "Error: RELATIVE_PROTOBUF_TEXT_GENERATE_CPP() called without any proto files")
-#    return()
-#  endif()
-#
-#  set(${SRCS})
-#  set(${HDRS})
-#  foreach(FIL ${ARGN})
-#    set(ABS_FIL ${ROOT_DIR}/${FIL})
-#    get_filename_component(FIL_WE ${FIL} NAME_WE)
-#    get_filename_component(FIL_DIR ${ABS_FIL} PATH)
-#    file(RELATIVE_PATH REL_DIR ${ROOT_DIR} ${FIL_DIR})
-#
-#    list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb_text.cc")
-#    list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb_text.h")
-#
-#    add_custom_command(
-#      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb_text.cc"
-#             "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb_text.h"
-#      COMMAND ${PROTO_TEXT_EXE}
-#      ARGS "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}" ${REL_DIR} ${ABS_FIL} "${ROOT_DIR}/tensorflow/tools/proto_text/placeholder.txt"
-#      DEPENDS ${ABS_FIL} ${PROTO_TEXT_EXE}
-#      COMMENT "Running C++ protocol buffer text compiler (${PROTO_TEXT_EXE}) on ${FIL}"
-#      VERBATIM )
-#  endforeach()
-#
-#  set_source_files_properties(${${SRCS}} ${${HDRS}} PROPERTIES GENERATED TRUE)
-#  set(${SRCS} ${${SRCS}} PARENT_SCOPE)
-#  set(${HDRS} ${${HDRS}} PARENT_SCOPE)
-#endfunction()
 
 if(NOT PYTHON_INCLUDE_DIR)
   set(PYTHON_NOT_FOUND false)
@@ -222,47 +191,6 @@ RELATIVE_PROTOBUF_GENERATE_CPP(ALL_PROTO_SRCS ALL_PROTO_HDRS
     ${tensorflow_source_dir} ${tf_python_protos_cc_srcs}
 )
 
-file(GLOB_RECURSE tf_framework_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
-    "${tensorflow_source_dir}/tensorflow/core/profiler/*.proto"
-    "${tensorflow_source_dir}/tensorflow/core/*.proto"
-    "${tensorflow_source_dir}/tensorflow/core/framework/*.proto"
-    "${tensorflow_source_dir}/tensorflow/core/lib/core/error_codes.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/cluster.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/config.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/debug.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/device_properties.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/rewriter_config.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/tensor_bundle.proto"
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/saver.proto"
-    "${tensorflow_source_dir}/tensorflow/core/util/memmapped_file_system.proto"
-    "${tensorflow_source_dir}/tensorflow/core/util/saved_tensor_slice.proto"
-)
-RELATIVE_PROTOBUF_GENERATE_CPP(FRAMEWORK_PROTO_SRCS FRAMEWORK_PROTO_HDRS
-    ${tensorflow_source_dir} ${tf_framework_protos_cc_srcs}
-)
-set(tf_core_text_protos_cc_srcs
-    "tensorflow/core/framework/device_attributes.proto"
-    "tensorflow/core/framework/tensor.proto"
-    "tensorflow/core/framework/op_def.proto"
-)
-
-#RELATIVE_PROTOBUF_TEXT_GENERATE_CPP(CORE_TEXT_PROTO_SRCS CORE_TEXT_PROTO_HDRS
-#  ${tensorflow_source_dir} ${tf_core_text_protos_cc_srcs}
-#)
-#add_custom_target(text_proto_hdrs DEPENDS ${CORE_TEXT_PROTO_HDRS})
-#add_dependencies(text_proto_hdrs framework_proto_hdrs)
-
-add_custom_target(framework_proto_hdrs DEPENDS ${FRAMEWORK_PROTO_HDRS})
-file(GLOB_RECURSE tf_core_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
-    "${tensorflow_source_dir}/tensorflow/core/protobuf/*.proto"
-    "${tensorflow_source_dir}/tensorflow/core/lib/*.proto"
-)
-RELATIVE_PROTOBUF_GENERATE_CPP(CORE_PROTO_SRCS CORE_PROTO_HDRS
-    ${tensorflow_source_dir} ${tf_core_protos_cc_srcs}
-)
-add_custom_target(core_proto_hdrs DEPENDS ${CORE_PROTO_HDRS})
-add_dependencies(core_proto_hdrs framework_proto_hdrs text_proto_hdrs)
-
 file(GLOB_RECURSE tf_python_protos_cc_srcs RELATIVE ${tensorflow_source_dir}
     "${tensorflow_source_dir}/tensorflow/python/*.proto"
 )
@@ -270,11 +198,8 @@ RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS
     ${tensorflow_source_dir} ${tf_python_protos_cc_srcs}
 )
 
-add_library(tf_python_all_protos_cc ${ALL_PROTO_SRCS} ${ALL_PROTO_HDRS})
-add_dependencies(tf_python_all_protos_cc core_proto_hdrs text_proto_hdrs)
-
 add_library(tf_python_protos_cc ${PROTO_SRCS} ${PROTO_HDRS})
-add_dependencies(tf_python_protos_cc core_proto_hdrs text_proto_hdrs)
+target_link_libraries(tf_python_protos_cc tensorflow_protos)
 
 # tf_python_touchup_modules adds empty __init__.py files to all
 # directories containing Python code, so that Python will recognize
@@ -375,20 +300,16 @@ file(GLOB_RECURSE tf_user_ops_srcs
 )
 
 add_library(tf_user_ops OBJECT ${tf_user_ops_srcs})
-add_dependencies(tf_user_ops tf_python_all_protos_cc)
 
 set(tf_python_op_gen_main_srcs
-    "${tensorflow_source_dir}/tensorflow/python/eager/python_eager_op_gen.h"
-    "${tensorflow_source_dir}/tensorflow/python/eager/python_eager_op_gen.cc"
     "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen.cc"
-    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen.cc"
-    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_main.cc"
     "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen.h"
+    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_internal.cc"
     "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_internal.h"
+    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_main.cc"
 )
 
 add_library(tf_python_op_gen_main OBJECT ${tf_python_op_gen_main_srcs})
-add_dependencies(tf_python_op_gen_main tf_python_protos_cc tf_python_all_protos_cc)
 
 # create directory for ops generated files
 set(python_ops_target_dir ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/ops)
@@ -427,13 +348,13 @@ function(GENERATE_PYTHON_OP_LIB tf_python_op_lib_name)
     )
     target_link_libraries(${tf_python_op_lib_name}_gen_python PRIVATE
         protobuf::libprotobuf
-	tf_python_all_protos_cc
         tensorflow_core_lib
         tensorflow_protos
         ZLIB::ZLIB
         Snappy::snappy
         nsync
         dl
+        double-conversion-tf
         ${tensorflow_EXTERNAL_LIBRARIES}
     )
 
@@ -441,7 +362,7 @@ function(GENERATE_PYTHON_OP_LIB tf_python_op_lib_name)
     # containing the wrappers.
     add_custom_command(
       OUTPUT ${GENERATE_PYTHON_OP_LIB_DESTINATION}
-      COMMAND ${tf_python_op_lib_name}_gen_python @${tensorflow_source_dir}/tensorflow/python/ops/hidden_ops.txt ${require_shape_fn} > ${GENERATE_PYTHON_OP_LIB_DESTINATION}
+      COMMAND ${tf_python_op_lib_name}_gen_python ${tensorflow_source_dir}/tensorflow/core/api_def/base_api,${tensorflow_source_dir}/tensorflow/core/api_def/python_api ${require_shape_fn} > ${GENERATE_PYTHON_OP_LIB_DESTINATION}
       DEPENDS ${tf_python_op_lib_name}_gen_python
     )
 
@@ -468,20 +389,28 @@ function(PYTHON_SYMLINK_CUSTOM_OPS_LIB TGT LOC LIBNAME)
 endfunction()
 
 set(tf_op_lib_names
+    "audio_ops"
     "array_ops"
+    "batch_ops"
     "bitwise_ops"
+    "boosted_trees_ops"
     "candidate_sampling_ops"
     "checkpoint_ops"
     "control_flow_ops"
     "ctc_ops"
+    "cudnn_rnn_ops"
     "data_flow_ops"
     "dataset_ops"
+    "decode_proto_ops"
+    "encode_proto_ops"
     "functional_ops"
     "image_ops"
     "io_ops"
     "linalg_ops"
+    "list_ops"
     "lookup_ops"
     "logging_ops"
+    "manip_ops"
     "math_ops"
     "nn_ops"
     "no_op"
@@ -489,6 +418,7 @@ set(tf_op_lib_names
     "random_ops"
     "remote_fused_graph_ops"
     "resource_variable_ops"
+    "rpc_ops"
     "script_ops"
     "sdca_ops"
     "set_ops"
@@ -498,6 +428,7 @@ set(tf_op_lib_names
     "state_ops"
     "stateless_random_ops"
     "string_ops"
+    "summary_ops"
     "training_ops"
 )
 
@@ -510,7 +441,6 @@ foreach(tf_op_lib_name ${tf_op_lib_names})
     )
 
     add_library(tf_${tf_op_lib_name} OBJECT ${tf_${tf_op_lib_name}_srcs})
-    add_dependencies(tf_${tf_op_lib_name} tf_python_all_protos_cc)
 
 endforeach()
 
@@ -519,11 +449,9 @@ file(GLOB tf_debug_ops_srcs
 )
 
 add_library(tf_debug_ops OBJECT ${tf_debug_ops_srcs})
-add_dependencies(tf_debug_ops tf_python_protos_cc tf_python_all_protos_cc)
 
 function(GENERATE_CONTRIB_OP_LIBRARY op_lib_name cc_srcs)
     add_library(tf_contrib_${op_lib_name}_ops OBJECT ${cc_srcs})
-    add_dependencies(tf_contrib_${op_lib_name}_ops tf_python_all_protos_cc)
 endfunction()
 
 file(GLOB_RECURSE tensor_forest_hybrid_srcs
@@ -534,15 +462,14 @@ file(GLOB_RECURSE tpu_ops_srcs
      "${tensorflow_source_dir}/tensorflow/contrib/tpu/ops/*.cc"
 )
 
-GENERATE_CONTRIB_OP_LIBRARY(batch "${tensorflow_source_dir}/tensorflow/contrib/batching/ops/batch_ops.cc")
-#GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_ensemble_optimizer "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/ensemble_optimizer_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_model "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/model_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_split_handler "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/split_handler_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_training "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/training_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_prediction "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/prediction_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_quantiles "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/quantile_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_stats_accumulator "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/stats_accumulator_ops.cc")
-GENERATE_CONTRIB_OP_LIBRARY(cudnn_rnn "${tensorflow_source_dir}/tensorflow/contrib/cudnn_rnn/ops/cudnn_rnn_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(coder "${tensorflow_source_dir}/tensorflow/contrib/coder/ops/coder_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(data_dataset "${tensorflow_source_dir}/tensorflow/contrib/data/ops/dataset_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(factorization_clustering "${tensorflow_source_dir}/tensorflow/contrib/factorization/ops/clustering_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(factorization_factorization "${tensorflow_source_dir}/tensorflow/contrib/factorization/ops/factorization_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(framework_variable "${tensorflow_source_dir}/tensorflow/contrib/framework/ops/variable_ops.cc")
@@ -553,6 +480,7 @@ GENERATE_CONTRIB_OP_LIBRARY(image_sirds "${tensorflow_source_dir}/tensorflow/con
 GENERATE_CONTRIB_OP_LIBRARY(layers_sparse_feature_cross "${tensorflow_source_dir}/tensorflow/contrib/layers/ops/sparse_feature_cross_op.cc")
 GENERATE_CONTRIB_OP_LIBRARY(memory_stats "${tensorflow_source_dir}/tensorflow/contrib/memory_stats/ops/memory_stats_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(nccl "${tensorflow_source_dir}/tensorflow/contrib/nccl/ops/nccl_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(periodic_resample "${tensorflow_source_dir}/tensorflow/contrib/periodic_resample/ops/array_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(nearest_neighbor "${tensorflow_source_dir}/tensorflow/contrib/nearest_neighbor/ops/nearest_neighbor_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(resampler "${tensorflow_source_dir}/tensorflow/contrib/resampler/ops/resampler_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(rnn_gru "${tensorflow_source_dir}/tensorflow/contrib/rnn/ops/gru_ops.cc")
@@ -565,10 +493,14 @@ GENERATE_CONTRIB_OP_LIBRARY(tensor_forest_stats "${tensorflow_source_dir}/tensor
 GENERATE_CONTRIB_OP_LIBRARY(text_skip_gram "${tensorflow_source_dir}/tensorflow/contrib/text/ops/skip_gram_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(tpu "${tpu_ops_srcs}")
 GENERATE_CONTRIB_OP_LIBRARY(bigquery_reader "${tensorflow_source_dir}/tensorflow/contrib/cloud/ops/bigquery_reader_ops.cc")
-GENERATE_CONTRIB_OP_LIBRARY(reduce_slice "${tensorflow_source_dir}/tensorflow/contrib/reduce_slice_ops/ops/reduce_slice_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(gcs_config "${tensorflow_source_dir}/tensorflow/contrib/cloud/ops/gcs_config_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(reduce_slice_ops "${tensorflow_source_dir}/tensorflow/contrib/reduce_slice_ops/ops/reduce_slice_ops.cc")
 
+GENERATE_PYTHON_OP_LIB("audio_ops")
 GENERATE_PYTHON_OP_LIB("array_ops")
+GENERATE_PYTHON_OP_LIB("batch_ops")
 GENERATE_PYTHON_OP_LIB("bitwise_ops")
+GENERATE_PYTHON_OP_LIB("boosted_trees_ops")
 GENERATE_PYTHON_OP_LIB("math_ops")
 GENERATE_PYTHON_OP_LIB("functional_ops")
 GENERATE_PYTHON_OP_LIB("candidate_sampling_ops")
@@ -576,19 +508,28 @@ GENERATE_PYTHON_OP_LIB("checkpoint_ops")
 GENERATE_PYTHON_OP_LIB("control_flow_ops"
   ADDITIONAL_LIBRARIES $<TARGET_OBJECTS:tf_no_op>)
 GENERATE_PYTHON_OP_LIB("ctc_ops")
+GENERATE_PYTHON_OP_LIB("cudnn_rnn_ops")
 GENERATE_PYTHON_OP_LIB("data_flow_ops")
 GENERATE_PYTHON_OP_LIB("dataset_ops")
+GENERATE_PYTHON_OP_LIB("decode_proto_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/proto/python/ops/gen_decode_proto_op.py)
+GENERATE_PYTHON_OP_LIB("encode_proto_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/proto/python/ops/gen_encode_proto_op.py)
 GENERATE_PYTHON_OP_LIB("image_ops")
 GENERATE_PYTHON_OP_LIB("io_ops")
 GENERATE_PYTHON_OP_LIB("linalg_ops")
+GENERATE_PYTHON_OP_LIB("list_ops")
 GENERATE_PYTHON_OP_LIB("logging_ops")
 GENERATE_PYTHON_OP_LIB("lookup_ops")
 GENERATE_PYTHON_OP_LIB("nn_ops")
+GENERATE_PYTHON_OP_LIB("manip_ops")
 GENERATE_PYTHON_OP_LIB("parsing_ops")
 GENERATE_PYTHON_OP_LIB("random_ops")
 GENERATE_PYTHON_OP_LIB("remote_fused_graph_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/remote_fused_graph/pylib/python/ops/gen_remote_fused_graph_ops.py)
 GENERATE_PYTHON_OP_LIB("resource_variable_ops")
+GENERATE_PYTHON_OP_LIB("rpc_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rpc/python/ops/gen_rpc_op.py)
 GENERATE_PYTHON_OP_LIB("script_ops")
 GENERATE_PYTHON_OP_LIB("sdca_ops")
 GENERATE_PYTHON_OP_LIB("set_ops")
@@ -596,16 +537,10 @@ GENERATE_PYTHON_OP_LIB("state_ops")
 GENERATE_PYTHON_OP_LIB("sparse_ops")
 GENERATE_PYTHON_OP_LIB("spectral_ops")
 GENERATE_PYTHON_OP_LIB("string_ops")
+GENERATE_PYTHON_OP_LIB("summary_ops")
 GENERATE_PYTHON_OP_LIB("user_ops")
 GENERATE_PYTHON_OP_LIB("training_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/training/gen_training_ops.py)
-
-GENERATE_PYTHON_OP_LIB("contrib_batch_ops"
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/batching/ops/gen_batch_ops.py)
-GENERATE_PYTHON_OP_LIB("contrib_tpu_ops"
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/ops/gen_tpu_ops.py)
-#GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_ensemble_optimizer_ops"
-#  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_ensemble_optimizer_ops.py)
 
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_model_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_model_ops.py)
@@ -619,8 +554,10 @@ GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_quantiles_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_quantile_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_stats_accumulator_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/gen_stats_accumulator_ops.py)
-GENERATE_PYTHON_OP_LIB("contrib_cudnn_rnn_ops"
-  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cudnn_rnn/ops/gen_cudnn_rnn_ops.py)
+GENERATE_PYTHON_OP_LIB("contrib_coder_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/coder/python/ops/gen_coder_ops.py)
+GENERATE_PYTHON_OP_LIB("contrib_data_dataset_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/data/python/ops/gen_dataset_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_factorization_clustering_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/factorization/python/ops/gen_clustering_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_factorization_factorization_ops"
@@ -641,6 +578,9 @@ GENERATE_PYTHON_OP_LIB("contrib_memory_stats_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/memory_stats/ops/gen_memory_stats_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_nccl_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/nccl/ops/gen_nccl_ops.py)
+GENERATE_PYTHON_OP_LIB("contrib_periodic_resample_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/periodic_resample/python/ops/gen_periodic_resample_op.py)
+
 GENERATE_PYTHON_OP_LIB("contrib_nearest_neighbor_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/nearest_neighbor/ops/gen_nearest_neighbor_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_resampler_ops"
@@ -663,21 +603,21 @@ GENERATE_PYTHON_OP_LIB("contrib_text_skip_gram_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/text/python/ops/gen_skip_gram_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_bigquery_reader_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cloud/python/ops/gen_bigquery_reader_ops.py)
+GENERATE_PYTHON_OP_LIB("contrib_gcs_config_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cloud/python/ops/gen_gcs_config_ops.py)
 GENERATE_PYTHON_OP_LIB("stateless_random_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/stateless/gen_stateless_random_ops.py)
 GENERATE_PYTHON_OP_LIB("debug_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/debug/ops/gen_debug_ops.py)
 
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(batch_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/batch/python/ops/" "_batch_ops.so")
+add_custom_target(tf_python_ops SOURCES ${tf_python_ops_generated_files} ${PYTHON_PROTO_GENFILES})
+add_dependencies(tf_python_ops tf_python_op_gen_main)
+
+#PYTHON_SYMLINK_CUSTOM_OPS_LIB(batch_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/batch/python/ops/" "_batch_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(reduce_slice_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/reduce_slice_ops/python/ops/" "_reduce_slice_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(skip_gram_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/text/python/ops/" "_skip_gram_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(tpu_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/python/ops/" "_tpu_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_model_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_model_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_split_handler_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_split_handler_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_training_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_training_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_quantile_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_quantile_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_prediction_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_prediction_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_stats_accumulator_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_stats_accumulator_ops.so")
+PYTHON_SYMLINK_CUSTOM_OPS_LIB(boosted_trees_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/boosted_trees/python/ops/" "_boosted_trees_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(variable_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/framework/python/ops/" "_variable_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(memory_stats_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/memory_stats/python/ops/" "_memory_stats_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(tensor_forest_model_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tensor_forest/python/ops/" "_model_ops.so")
@@ -686,7 +626,7 @@ PYTHON_SYMLINK_CUSTOM_OPS_LIB(tensor_forest_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(tensor_forest_training_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tensor_forest/hybrid/python/ops/" "_training_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(nearest_neighbor_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/nearest_neighbor/python/ops/" "_nearest_neighbor_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(beam_search_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/seq2seq/python/ops/" "_beam_search_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(cudnn_rnn_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cudnn_rnn/python/ops/" "_cudnn_rnn_ops.so")
+#PYTHON_SYMLINK_CUSTOM_OPS_LIB(cudnn_rnn_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cudnn_rnn/python/ops/" "_cudnn_rnn_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(resampler_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/resampler/python/ops/" "_resampler_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(factorization_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/factorization/python/ops/" "_factorization_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(clustering_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/factorization/python/ops/" "_clustering_ops.so")
@@ -698,9 +638,6 @@ PYTHON_SYMLINK_CUSTOM_OPS_LIB(nccl_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/te
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(sparse_feature_cross_op "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/layers/python/ops/" "_sparse_feature_cross_op.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(gru_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/" "_gru_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(lstm_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/" "_lstm_ops.so")
-
-add_custom_target(tf_python_ops SOURCES ${tf_python_ops_generated_files} ${PYTHON_PROTO_GENFILES})
-add_dependencies(tf_python_ops tf_python_op_gen_main tf_python_all_protos_cc)
 
 find_package(SWIG REQUIRED)
 # Generate the C++ and Python source code for the SWIG wrapper.
@@ -731,12 +668,14 @@ set (pywrap_tensorflow_internal_src
     "${tensorflow_source_dir}/tensorflow/python/eager/pywrap_tfe_src.cc"
     "${tensorflow_source_dir}/tensorflow/python/client/tf_session_helper.h"
     "${tensorflow_source_dir}/tensorflow/python/client/tf_session_helper.cc"
-    "${tensorflow_source_dir}/tensorflow/python/eager/python_eager_op_gen.h"
-    "${tensorflow_source_dir}/tensorflow/python/eager/python_eager_op_gen.cc"
     "${tensorflow_source_dir}/tensorflow/python/framework/cpp_shape_inference.h"
     "${tensorflow_source_dir}/tensorflow/python/framework/cpp_shape_inference.cc"
     "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen.h"
     "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen.cc"
+    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_internal.h"
+    "${tensorflow_source_dir}/tensorflow/python/framework/python_op_gen_internal.cc"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/bfloat16.h"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/bfloat16.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/numpy.h"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/numpy.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/ndarray_tensor.h"
@@ -745,8 +684,12 @@ set (pywrap_tensorflow_internal_src
     "${tensorflow_source_dir}/tensorflow/python/lib/core/ndarray_tensor_bridge.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/py_func.h"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/py_func.cc"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/py_exception_registry.h"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/py_exception_registry.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/py_seq_tensor.h"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/py_seq_tensor.cc"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/py_util.h"
+    "${tensorflow_source_dir}/tensorflow/python/lib/core/py_util.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/safe_ptr.h"
     "${tensorflow_source_dir}/tensorflow/python/lib/core/safe_ptr.cc"
     "${tensorflow_source_dir}/tensorflow/python/lib/io/py_record_reader.h"
@@ -755,8 +698,11 @@ set (pywrap_tensorflow_internal_src
     "${tensorflow_source_dir}/tensorflow/python/lib/io/py_record_writer.cc"
     "${tensorflow_source_dir}/tensorflow/python/util/kernel_registry.h"
     "${tensorflow_source_dir}/tensorflow/python/util/kernel_registry.cc"
+    "${tensorflow_source_dir}/tensorflow/python/util/util.h"
+    "${tensorflow_source_dir}/tensorflow/python/util/util.cc"
     "${tensorflow_source_dir}/tensorflow/cc/framework/ops.cc"
     "${tensorflow_source_dir}/tensorflow/cc/framework/scope.cc"
+    "${tensorflow_source_dir}/tensorflow/c/python_api.cc"
     "${CMAKE_CURRENT_BINARY_DIR}/pywrap_tensorflow_internal.cc"
 )
 
@@ -883,3 +829,134 @@ add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
 add_custom_command(TARGET tf_python_build_pip_package POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${tensorflow_source_dir}/tensorflow/stream_executor
                                    ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/include/tensorflow/stream_executor)
+
+########################################################
+# Generate API __init__.py files.
+########################################################
+
+# Parse tensorflow/python/tools/api/generator/BUILD to get list of generated files.
+FILE(READ ${tensorflow_source_dir}/tensorflow/python/tools/api/generator/api_gen.bzl api_generator_BUILD_text)
+STRING(REGEX MATCH "# BEGIN GENERATED FILES.*# END GENERATED FILES" api_init_files_text ${api_generator_BUILD_text})
+string(REPLACE "# BEGIN GENERATED FILES" "" api_init_files_text ${api_init_files_text})
+string(REPLACE "# END GENERATED FILES" "" api_init_files_text ${api_init_files_text})
+string(REPLACE "," ";" api_init_files_list ${api_init_files_text})
+
+set(api_init_files "")
+foreach(api_init_file ${api_init_files_list})
+    string(STRIP "${api_init_file}" api_init_file)
+    if(api_init_file)
+        string(REPLACE "\"" "" api_init_file "${api_init_file}")  # Remove quotes
+        list(APPEND api_init_files "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/${api_init_file}")
+    endif()
+endforeach(api_init_file)
+set(api_init_list_file "${tensorflow_source_dir}/api_init_files_list.txt")
+file(WRITE "${api_init_list_file}" "${api_init_files}")
+
+# Run create_python_api.py to generate __init__.py files.
+
+### TODO
+# In order to download and compile MKL/MKL-DNN automatically in cmake script, mkl-built libraries should be added to system path
+# to be loaded by python executor. However `add_custom_command` has an issue with `COMMAND ${CMAKE_COMMAND} -E env PATH=`, where
+# arguments of multiple paths (such as D:/;D:/mkl) will be parsed in to seperate string without semicolon and that command fail to
+# recongnize paths. As CUDA isn't built with MKL, the MKL built directory is the only path to this command to work around that issue.
+# To not override the CUDA and system path in other circumstances, `if-else` branch used here to handle this problem,
+# and should be removed if the path issue can be resolved.
+###
+
+if (tensorflow_ENABLE_MKL_SUPPORT)
+    # add mkl dist dlls to system path for python
+    # TODO: In current cmake version, PY_RUNTIME_ENV behaves strange with multiple paths,
+    # so we have to specify only one path in it to work around the issue. We need this if/else
+    # to protect overwriting CUDA environments
+    set(PY_RUNTIME_ENV ${mkl_BIN_DIRS})
+    add_custom_command(
+          OUTPUT ${api_init_files}
+          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+
+          # tensorflow/__init__.py depends on files generated in this step. So, remove it while
+          # this step is running since the files aren't there yet.
+          COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/__init__.py
+
+          # Run create_python_api.py to generate API init files.
+          COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/tf_python PATH=${PY_RUNTIME_ENV} ${PYTHON_EXECUTABLE}
+                  "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/tools/api/generator/create_python_api.py"
+                  "--root_init_template=${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/api_template.__init__.py"
+                  "--apidir=${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow"
+                  "--package=tensorflow.python"
+                  "--apiname=tensorflow"
+                  "${api_init_list_file}"
+
+          COMMENT "Generating __init__.py files for Python API."
+          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tf_python"
+          VERBATIM
+    )
+else (tensorflow_ENABLE_MKL_SUPPORT)
+    add_custom_command(
+          OUTPUT ${api_init_files}
+          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+
+          # tensorflow/__init__.py depends on files generated in this step. So, remove it while
+          # this step is running since the files aren't there yet.
+          COMMAND ${CMAKE_COMMAND} -E remove -f ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/__init__.py
+
+          # Run create_python_api.py to generate API init files.
+          COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/tf_python ${PYTHON_EXECUTABLE}
+                  "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/tools/api/generator/create_python_api.py"
+                  "--root_init_template=${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/api_template.__init__.py"
+                  "--apidir=${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow"
+                  "--package=tensorflow.python"
+                  "--apiname=tensorflow"
+                  "${api_init_list_file}"
+
+          COMMENT "Generating __init__.py files for Python API."
+          WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tf_python"
+    )
+endif (tensorflow_ENABLE_MKL_SUPPORT)
+
+add_custom_target(tf_python_api SOURCES ${api_init_files})
+add_dependencies(tf_python_api tf_python_ops)
+
+# TODO(mikecase): This can be removed once tf.estimator is moved
+# out of TensorFlow.
+########################################################
+# Generate API __init__.py files for tf.estimator.
+########################################################
+
+# Parse tensorflow/python/tools/api/generator/BUILD to get list of generated files.
+FILE(READ ${tensorflow_source_dir}/tensorflow/python/tools/api/generator/api_gen.bzl api_generator_BUILD_text)
+STRING(REGEX MATCH "# BEGIN GENERATED ESTIMATOR FILES.*# END GENERATED ESTIMATOR FILES" api_init_files_text ${api_generator_BUILD_text})
+string(REPLACE "# BEGIN GENERATED ESTIMATOR FILES" "" api_init_files_text ${api_init_files_text})
+string(REPLACE "# END GENERATED ESTIMATOR FILES" "" api_init_files_text ${api_init_files_text})
+string(REPLACE "," ";" api_init_files_list ${api_init_files_text})
+
+set(api_init_files "")
+foreach(api_init_file ${api_init_files_list})
+    string(STRIP "${api_init_file}" api_init_file)
+    if(api_init_file)
+        string(REPLACE "\"" "" api_init_file "${api_init_file}")  # Remove quotes
+        list(APPEND api_init_files "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/estimator/api/${api_init_file}")
+    endif()
+endforeach(api_init_file)
+set(estimator_api_init_list_file "${tensorflow_source_dir}/estimator_api_init_files_list.txt")
+file(WRITE "${estimator_api_init_list_file}" "${api_init_files}")
+
+# Run create_python_api.py to generate __init__.py files.
+add_custom_command(
+      OUTPUT ${api_init_files}
+      DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+
+      # Run create_python_api.py to generate API init files.
+      COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/tf_python ${PYTHON_EXECUTABLE}
+              "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/tools/api/generator/create_python_api.py"
+              "--apidir=${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/estimator/api"
+              "--package=tensorflow.python.estimator"
+              "--apiname=estimator"
+	      "--output_package=tensorflow.python.estimator.api"
+              "${estimator_api_init_list_file}"
+
+      COMMENT "Generating __init__.py files for Python API."
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/tf_python"
+)
+
+add_custom_target(estimator_python_api SOURCES ${api_init_files})
+add_dependencies(estimator_python_api tf_python_ops)
