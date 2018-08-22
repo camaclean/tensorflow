@@ -495,6 +495,7 @@ GENERATE_CONTRIB_OP_LIBRARY(tpu "${tpu_ops_srcs}")
 GENERATE_CONTRIB_OP_LIBRARY(bigquery_reader "${tensorflow_source_dir}/tensorflow/contrib/cloud/ops/bigquery_reader_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(gcs_config "${tensorflow_source_dir}/tensorflow/contrib/cloud/ops/gcs_config_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(reduce_slice_ops "${tensorflow_source_dir}/tensorflow/contrib/reduce_slice_ops/ops/reduce_slice_ops.cc")
+GENERATE_CONTRIB_OP_LIBRARY(bigtable "${tensorflow_source_dir}/tensorflow/contrib/bigtable/ops/bigtable_ops.cc")
 
 GENERATE_PYTHON_OP_LIB("audio_ops")
 GENERATE_PYTHON_OP_LIB("array_ops")
@@ -542,6 +543,8 @@ GENERATE_PYTHON_OP_LIB("user_ops")
 GENERATE_PYTHON_OP_LIB("training_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/python/training/gen_training_ops.py)
 
+GENERATE_PYTHON_OP_LIB("contrib_bigtable_ops"
+  DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/bigtable/ops/gen_bigtable_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_tpu_ops"
   DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/ops/gen_tpu_ops.py)
 GENERATE_PYTHON_OP_LIB("contrib_boosted_trees_model_ops"
@@ -642,7 +645,7 @@ PYTHON_SYMLINK_CUSTOM_OPS_LIB(gru_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/ten
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(lstm_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/rnn/python/ops/" "_lstm_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(coder_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/coder/python/ops/" "_coder_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(dataset_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/data/" "_dataset_ops.so")
-PYTHON_SYMLINK_CUSTOM_OPS_LIB(periodic_resample "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/periodic_resample/python/ops/" "_periodic_resample_op.so")
+PYTHON_SYMLINK_CUSTOM_OPS_LIB(periodic_resample_op "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/periodic_resample/python/ops/" "_periodic_resample_op.so")
 
 find_package(SWIG REQUIRED)
 # Generate the C++ and Python source code for the SWIG wrapper.
