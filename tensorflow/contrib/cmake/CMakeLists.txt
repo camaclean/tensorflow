@@ -232,9 +232,10 @@ find_package(LMDB REQUIRED)
 find_package(Eigen3Tensorflow REQUIRED CONFIG)
 #find_package(jsoncpp)
 include(gemmlowp)
-include(jsoncpp)
+#include(jsoncpp)
 include(farmhash)
 include(fft2d)
+find_package(jsoncpp REQUIRED)
 find_package(highwayhash REQUIRED)
 find_package(nsync REQUIRED)
 set(protobuf_MODULE_COMPATIBLE ON)
@@ -262,8 +263,8 @@ set(tensorflow_EXTERNAL_LIBRARIES
     ZLIB::ZLIB
     Eigen3::Eigen
     #highwayhash #no longer used?
-    ${jsoncpp_STATIC_LIBRARIES}
-    #jsoncpp_lib
+    #${jsoncpp_STATIC_LIBRARIES}
+    jsoncpp_lib
     ${farmhash_STATIC_LIBRARIES}
     ${fft2d_STATIC_LIBRARIES}
     protobuf::libprotobuf
@@ -281,9 +282,9 @@ set(tensorflow_EXTERNAL_DEPENDENCIES
     fft2d
     #double_conversion
 )
-#get_target_property(JSONCPP_INCLUDE_DIR jsoncpp_lib
-#  INTERFACE_INCLUDE_DIRECTORIES
-#)
+get_target_property(JSONCPP_INCLUDE_DIR jsoncpp_lib
+  INTERFACE_INCLUDE_DIRECTORIES
+)
 
 include_directories(
     # Source and generated code.
@@ -296,7 +297,8 @@ include_directories(
     $<TARGET_PROPERTY:Eigen3::Eigen,INTERFACE_INCLUDE_DIRECTORIES>
     #${EIGEN3_INCLUDE_DIRS}
     ${gemmlowp_INCLUDE_DIR}
-    "${jsoncpp_INCLUDE_DIR}"
+    #"${jsoncpp_INCLUDE_DIR}"
+    ${JSONCPP_INCLUDE_DIR}
     ${farmhash_INCLUDE_DIR}
     ${HIGHWAYHASH_INCLUDE_DIR}
     ${cub_INCLUDE_DIR}
