@@ -671,7 +671,6 @@ set(tf_bigtable_srcs
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_sample_keys_dataset_op.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_sample_key_pairs_dataset_op.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_key_dataset_op.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_helpers_test.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_range_helpers.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_prefix_key_dataset_op.cc"
     "${tensorflow_source_dir}/tensorflow/contrib/bigtable/kernels/bigtable_lookup_dataset_op.cc"
@@ -718,7 +717,7 @@ set(tf_periodic_resample_srcs
     $<TARGET_OBJECTS:tf_contrib_periodic_resample_ops>
 )
 
-AddUserOps(TARGET periodic_resample
+AddUserOps(TARGET periodic_resample_op
     SOURCES "${tf_periodic_resample_srcs}"
     DEPENDS tf_contrib_periodic_resample_ops
 )
