@@ -259,7 +259,7 @@ set(tensorflow_EXTERNAL_LIBRARIES
     PNG::PNG
     ${JPEG_LIBRARIES}
     ${GIF_LIBRARIES}
-    nsync
+    nsync_cpp
     ZLIB::ZLIB
     Eigen3::Eigen
     #highwayhash #no longer used?
