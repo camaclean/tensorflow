@@ -22,7 +22,6 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
     message(SEND_ERROR "Error: RELATIVE_PROTOBUF_GENERATE_CPP() called without any proto files")
     return()
   endif()
-  message("Protobuf_PROTOC_EXECUTABLE: ${Protobuf_PROTOC_EXECUTABLE}")
 
   set(${SRCS})
   set(${HDRS})
@@ -38,8 +37,7 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
     add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc"
              "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
-      #COMMAND  ${PROTOBUF_PROTOC_EXECUTABLE}
-      COMMAND  ${Protobuf_PROTOC_EXECUTABLE}
+      COMMAND  $<TARGET_FILE:protobuf::protoc>
       ARGS --cpp_out  ${CMAKE_CURRENT_BINARY_DIR} -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
       DEPENDS ${ABS_FIL}
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
@@ -51,7 +49,6 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
   set(${HDRS} ${${HDRS}} PARENT_SCOPE)
 endfunction()
 
-set(GRPC_BUILD "/mnt/bwpy/single/usr/bin")
 if(NOT WIN32)
   function(RELATIVE_PROTOBUF_GENERATE_GRPC_CPP SRCS HDRS ROOT_DIR)
     if(NOT ARGN)
@@ -69,16 +66,12 @@ if(NOT WIN32)
 
       list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.grpc.pb.cc")
       list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.grpc.pb.h")
-      list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc")
-      list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h")
 
       add_custom_command(
         OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.grpc.pb.cc"
                "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.grpc.pb.h"
-               "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc"
-               "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
-        COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-        ARGS --grpc_out ${CMAKE_CURRENT_BINARY_DIR} --cpp_out ${CMAKE_CURRENT_BINARY_DIR} --plugin protoc-gen-grpc=${GRPC_BUILD}/grpc_cpp_plugin -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
+        COMMAND  $<TARGET_FILE:protobuf::protoc>
+        ARGS --grpc_out ${CMAKE_CURRENT_BINARY_DIR} --plugin protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin> -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
         DEPENDS ${ABS_FIL}
         COMMENT "Running C++ protocol buffer grpc compiler on ${FIL}"
         VERBATIM )
@@ -194,10 +187,14 @@ if(tensorflow_ENABLE_GRPC_SUPPORT)
   file(GLOB_RECURSE tf_protos_grpc_cc_srcs RELATIVE ${tensorflow_source_dir}
       "${tensorflow_source_dir}/tensorflow/core/debug/*.proto"
   )
+  # Generate the two .cc files separately to play nice with Ninja
   RELATIVE_PROTOBUF_GENERATE_GRPC_CPP(PROTO_GRPC_SRCS PROTO_GRPC_HDRS
       ${tensorflow_source_dir} ${tf_protos_grpc_cc_srcs}
   )
-  add_library(tensorflow_protos SHARED ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_SRCS} ${PROTO_HDRS})
+  RELATIVE_PROTOBUF_GENERATE_CPP(PROTO_GRPC_SRCS2 PROTO_GRPC_HDRS2
+      ${tensorflow_source_dir} ${tf_protos_grpc_cc_srcs}
+  )
+  add_library(tensorflow_protos SHARED ${PROTO_GRPC_SRCS} ${PROTO_GRPC_HDRS} ${PROTO_GRPC_SRCS2} ${PROTO_GRPC_HDRS2} ${PROTO_SRCS} ${PROTO_HDRS})
   target_link_libraries(tensorflow_protos gRPC::grpc_unsecure gRPC::grpc++_unsecure)
 else()
   add_library(tensorflow_protos ${PROTO_SRCS} ${PROTO_HDRS})

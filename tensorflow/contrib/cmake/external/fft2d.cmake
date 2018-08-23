@@ -21,33 +21,39 @@ set(fft2d_BUILD ${CMAKE_CURRENT_BINARY_DIR}/fft2d/)
 set(fft2d_INSTALL ${CMAKE_CURRENT_BINARY_DIR}/fft2d/src)
 
 if(WIN32)
-  set(fft2d_STATIC_LIBRARIES ${fft2d_BUILD}/src/lib/fft2d.lib)
-
-  ExternalProject_Add(fft2d
+  ExternalProject_Add(fft2d_proj
       PREFIX fft2d
       URL ${fft2d_URL}
       URL_HASH ${fft2d_HASH}
       DOWNLOAD_DIR "${DOWNLOAD_LOCATION}"
       BUILD_IN_SOURCE 1
-      BUILD_BYPRODUCTS ${fft2d_STATIC_LIBRARIES}
-      PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/patches/fft2d/CMakeLists.txt ${fft2d_BUILD}/src/fft2d/CMakeLists.txt
+      BUILD_BYPRODUCTS "${fft2d_BUILD}/src/fft2d_proj/libfft2d.lib"
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/patches/fft2d/CMakeLists.txt ${fft2d_BUILD}/src/fft2d_proj/CMakeLists.txt
       INSTALL_DIR ${fft2d_INSTALL}
       CMAKE_CACHE_ARGS
           -DCMAKE_BUILD_TYPE:STRING=Release
           -DCMAKE_VERBOSE_MAKEFILE:BOOL=OFF
           -DCMAKE_INSTALL_PREFIX:STRING=${fft2d_INSTALL})
+  set_target_properties(fft2d PROPERTIES IMPORTED_LOCATION "${fft2d_BUILD}/src/fft2d_proj/libfft2d.lib") 
 else()
-  set(fft2d_STATIC_LIBRARIES ${fft2d_BUILD}/src/fft2d/libfft2d.a)
 
-  ExternalProject_Add(fft2d
+  ExternalProject_Add(fft2d_proj
       PREFIX fft2d
       URL ${fft2d_URL}
       URL_HASH ${fft2d_HASH}
       DOWNLOAD_DIR "${DOWNLOAD_LOCATION}"
       BUILD_IN_SOURCE 1
-      PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/patches/fft2d/CMakeLists.txt ${fft2d_BUILD}/src/fft2d/CMakeLists.txt
+      PATCH_COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/patches/fft2d/CMakeLists.txt ${fft2d_BUILD}/src/fft2d_proj/CMakeLists.txt
       INSTALL_DIR ${fft2d_INSTALL}
       INSTALL_COMMAND echo
-      BUILD_COMMAND $(MAKE))
+      BUILD_COMMAND ${CMAKE_MAKE_PROGRAM}
+      #BUILD_COMMAND make
+      BUILD_BYPRODUCTS "${fft2d_BUILD}/src/fft2d_proj/libfft2d.a"
+)
+  add_library(fft2d UNKNOWN IMPORTED)
+  set_target_properties(fft2d PROPERTIES IMPORTED_LOCATION "${fft2d_BUILD}/src/fft2d_proj/libfft2d.a") 
     
 endif()
+
+add_dependencies(fft2d fft2d_proj)
+set(fft2d_STATIC_LIBRARIES fft2d)

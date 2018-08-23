@@ -265,7 +265,7 @@ set(tensorflow_EXTERNAL_LIBRARIES
     #highwayhash #no longer used?
     #${jsoncpp_STATIC_LIBRARIES}
     jsoncpp_lib
-    ${farmhash_STATIC_LIBRARIES}
+    farmhash
     ${fft2d_STATIC_LIBRARIES}
     protobuf::libprotobuf
     ${RE2_LIBRARIES}
@@ -282,9 +282,8 @@ set(tensorflow_EXTERNAL_DEPENDENCIES
     fft2d
     #double_conversion
 )
-get_target_property(JSONCPP_INCLUDE_DIR jsoncpp_lib
-  INTERFACE_INCLUDE_DIRECTORIES
-)
+
+
 
 include_directories(
     # Source and generated code.
@@ -297,8 +296,7 @@ include_directories(
     $<TARGET_PROPERTY:Eigen3::Eigen,INTERFACE_INCLUDE_DIRECTORIES>
     #${EIGEN3_INCLUDE_DIRS}
     ${gemmlowp_INCLUDE_DIR}
-    #"${jsoncpp_INCLUDE_DIR}"
-    ${JSONCPP_INCLUDE_DIR}
+    $<TARGET_PROPERTY:jsoncpp_lib,INTERFACE_INCLUDE_DIRECTORIES>
     ${farmhash_INCLUDE_DIR}
     ${HIGHWAYHASH_INCLUDE_DIR}
     ${cub_INCLUDE_DIR}
