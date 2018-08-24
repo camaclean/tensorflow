@@ -2,13 +2,13 @@
 cmake_minimum_required(VERSION 3.5)
 
 # Project
-project(TensorflowMPI C CXX)
+project(TensorflowPython C CXX)
 
 # Set C++14 as standard for the whole project
 set(CMAKE_CXX_STANDARD 14)
 
 # Actual source is the ../../.. directory
-get_filename_component(tf_contrib_source_dir ${TensorflowMPI_SOURCE_DIR} PATH)
+get_filename_component(tf_contrib_source_dir ${TensorflowPython_SOURCE_DIR} PATH)
 get_filename_component(tf_tf_source_dir ${tf_contrib_source_dir} PATH)
 get_filename_component(tensorflow_source_dir ${tf_tf_source_dir} PATH)
 
@@ -24,7 +24,7 @@ else()
     set(LIBSUFFIX "")
 endif()
 
-set(TENSORFLOW_LIB_VERSION 1.4.1)
+set(TENSORFLOW_LIB_VERSION 1.10.0)
 set(TENSORFLOW_LIB_SOVERSION 1)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -106,8 +106,7 @@ function(RELATIVE_PROTOBUF_GENERATE_PYTHON ROOT_DIR SRCS)
     list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${REL_DIR}/${FIL_WE}_pb2.py")
     add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/tf_python/${REL_DIR}/${FIL_WE}_pb2.py"
-      #COMMAND ${PROTOBUF_PROTOC_EXECUTABLE}
-      COMMAND ${Protobuf_PROTOC_EXECUTABLE}
+      COMMAND  $<TARGET_FILE:protobuf::protoc>
       ARGS --python_out  ${CMAKE_CURRENT_BINARY_DIR}/tf_python/ -I ${ROOT_DIR} -I ${PROTOBUF_INCLUDE_DIRS} ${ABS_FIL}
       COMMENT "Running Python protocol buffer compiler on ${FIL}"
       VERBATIM )
@@ -135,7 +134,7 @@ function(RELATIVE_PROTOBUF_GENERATE_CPP SRCS HDRS ROOT_DIR)
     add_custom_command(
       OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.cc"
              "${CMAKE_CURRENT_BINARY_DIR}/${REL_DIR}/${FIL_WE}.pb.h"
-      COMMAND  ${Protobuf_PROTOC_EXECUTABLE}
+      COMMAND  $<TARGET_FILE:protobuf::protoc>
       ARGS --cpp_out  ${CMAKE_CURRENT_BINARY_DIR} -I ${ROOT_DIR} ${ABS_FIL} -I ${PROTOBUF_INCLUDE_DIRS}
       DEPENDS ${ABS_FIL}
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
@@ -352,7 +351,7 @@ function(GENERATE_PYTHON_OP_LIB tf_python_op_lib_name)
         tensorflow_protos
         ZLIB::ZLIB
         Snappy::snappy
-        nsync
+        nsync_cpp
         dl
         double-conversion-tf
         ${tensorflow_EXTERNAL_LIBRARIES}
@@ -618,7 +617,6 @@ GENERATE_PYTHON_OP_LIB("debug_ops"
 add_custom_target(tf_python_ops SOURCES ${tf_python_ops_generated_files} ${PYTHON_PROTO_GENFILES})
 add_dependencies(tf_python_ops tf_python_op_gen_main)
 
-#PYTHON_SYMLINK_CUSTOM_OPS_LIB(batch_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/batch/python/ops/" "_batch_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(reduce_slice_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/reduce_slice_ops/python/ops/" "_reduce_slice_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(skip_gram_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/text/python/ops/" "_skip_gram_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(tpu_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tpu/python/ops/" "_tpu_ops.so")
@@ -631,7 +629,6 @@ PYTHON_SYMLINK_CUSTOM_OPS_LIB(tensor_forest_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(tensor_forest_training_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/tensor_forest/hybrid/python/ops/" "_training_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(nearest_neighbor_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/nearest_neighbor/python/ops/" "_nearest_neighbor_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(beam_search_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/seq2seq/python/ops/" "_beam_search_ops.so")
-#PYTHON_SYMLINK_CUSTOM_OPS_LIB(cudnn_rnn_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/cudnn_rnn/python/ops/" "_cudnn_rnn_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(resampler_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/resampler/python/ops/" "_resampler_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(factorization_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/factorization/python/ops/" "_factorization_ops.so")
 PYTHON_SYMLINK_CUSTOM_OPS_LIB(clustering_ops "${CMAKE_CURRENT_BINARY_DIR}/tf_python/tensorflow/contrib/factorization/python/ops/" "_clustering_ops.so")
