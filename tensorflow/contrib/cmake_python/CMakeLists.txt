@@ -876,7 +876,8 @@ if (tensorflow_ENABLE_MKL_SUPPORT)
     set(PY_RUNTIME_ENV ${mkl_BIN_DIRS})
     add_custom_command(
           OUTPUT ${api_init_files}
-          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+          BYPRODUCTS ${api_init_files}
+          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules
 
           # tensorflow/__init__.py depends on files generated in this step. So, remove it while
           # this step is running since the files aren't there yet.
@@ -898,7 +899,8 @@ if (tensorflow_ENABLE_MKL_SUPPORT)
 else (tensorflow_ENABLE_MKL_SUPPORT)
     add_custom_command(
           OUTPUT ${api_init_files}
-          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+          BYPRODUCTS ${api_init_files}
+          DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules
 
           # tensorflow/__init__.py depends on files generated in this step. So, remove it while
           # this step is running since the files aren't there yet.
@@ -948,7 +950,8 @@ file(WRITE "${estimator_api_init_list_file}" "${api_init_files}")
 # Run create_python_api.py to generate __init__.py files.
 add_custom_command(
       OUTPUT ${api_init_files}
-      DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules tf_extension_ops
+      BYPRODUCTS ${api_init_files}
+      DEPENDS tf_python_ops tf_python_copy_scripts_to_destination pywrap_tensorflow_internal tf_python_touchup_modules
 
       # Run create_python_api.py to generate API init files.
       COMMAND ${CMAKE_COMMAND} -E env PYTHONPATH=${CMAKE_CURRENT_BINARY_DIR}/tf_python ${PYTHON_EXECUTABLE}
@@ -965,3 +968,7 @@ add_custom_command(
 
 add_custom_target(estimator_python_api SOURCES ${api_init_files})
 add_dependencies(estimator_python_api tf_python_ops)
+
+add_dependencies(tf_python_build_pip_package
+    tf_python_api
+    estimator_python_api)
