@@ -337,6 +337,9 @@ function(GENERATE_PYTHON_OP_LIB tf_python_op_lib_name)
       set(require_shape_fn 1)
     endif()
 
+    get_filename_component(GENERATE_PYTHON_OP_LIB_MKDIRPATH ${GENERATE_PYTHON_OP_LIB_DESTINATION} PATH)
+    file(MAKE_DIRECTORY ${GENERATE_PYTHON_OP_LIB_MKDIRPATH})
+
     # Create a C++ executable that links in the appropriate op
     # registrations and generates Python wrapper code based on the
     # registered ops.
@@ -972,3 +975,14 @@ add_dependencies(estimator_python_api tf_python_ops)
 add_dependencies(tf_python_build_pip_package
     tf_python_api
     estimator_python_api)
+
+MESSAGE(STATUS "<<< Gentoo configuration >>>
+Build type      ${CMAKE_BUILD_TYPE}
+Install path    ${CMAKE_INSTALL_PREFIX}
+Compiler flags:
+C               ${CMAKE_C_FLAGS}
+C++             ${CMAKE_CXX_FLAGS}
+Linker flags:
+Executable      ${CMAKE_EXE_LINKER_FLAGS}
+Module          ${CMAKE_MODULE_LINKER_FLAGS}
+Shared          ${CMAKE_SHARED_LINKER_FLAGS}\n")
