@@ -334,7 +334,6 @@ GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_quantiles "${tensorflow_source_dir}/te
 GENERATE_CONTRIB_OP_LIBRARY(boosted_trees_stats_accumulator "${tensorflow_source_dir}/tensorflow/contrib/boosted_trees/ops/stats_accumulator_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(bigtable "${tensorflow_source_dir}/tensorflow/contrib/bigtable/ops/bigtable_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(coder "${tensorflow_source_dir}/tensorflow/contrib/coder/ops/coder_ops.cc")
-GENERATE_CONTRIB_OP_LIBRARY(data_dataset "${tensorflow_source_dir}/tensorflow/contrib/data/ops/dataset_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(factorization_clustering "${tensorflow_source_dir}/tensorflow/contrib/factorization/ops/clustering_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(factorization_factorization "${tensorflow_source_dir}/tensorflow/contrib/factorization/ops/factorization_ops.cc")
 GENERATE_CONTRIB_OP_LIBRARY(framework_variable "${tensorflow_source_dir}/tensorflow/contrib/framework/ops/variable_ops.cc")
@@ -695,21 +694,6 @@ set(tf_coder_srcs
 AddUserOps(TARGET coder_ops
     SOURCES "${tf_coder_srcs}"
     DEPENDS tf_contrib_coder_ops
-)
-
-set(tf_dataset_srcs
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/unique_dataset_op.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/threadpool_dataset_op.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/prefetching_kernels.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/ignore_errors_dataset_op.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/directed_interleave_dataset_op.cc"
-    "${tensorflow_source_dir}/tensorflow/contrib/data/kernels/csv_dataset_op.cc"
-    $<TARGET_OBJECTS:tf_contrib_data_dataset_ops>
-)
-
-AddUserOps(TARGET dataset_ops
-    SOURCES "${tf_dataset_srcs}"
-    DEPENDS tf_contrib_data_dataset_ops
 )
 
 set(tf_periodic_resample_srcs
