@@ -41,7 +41,6 @@ endif()
 
 option(tensorflow_ENABLE_GRPC_SUPPORT "Enable gRPC support" ON)
 option(tensorflow_ENABLE_HDFS_SUPPORT "Enable HDFS support" OFF)
-option(tensorflow_ENABLE_JEMALLOC_SUPPORT "Enable jemalloc support" OFF)
 option(tensorflow_BUILD_CC_EXAMPLE "Build the C++ tutorial example" ON)
 option(tensorflow_BUILD_ALL_KERNELS "Build all OpKernels" ON)
 option(tensorflow_BUILD_CONTRIB_KERNELS "Build OpKernels from tensorflow/contrib/..." ON)
@@ -160,25 +159,40 @@ if(WIN32)
       # temporary fix for #18241
       add_definitions(-DEIGEN_DEFAULT_DENSE_INDEX_TYPE=std::int64_t)
   endif()
-  add_definitions(-DNOMINMAX -D_WIN32_WINNT=0x0A00 -DLANG_CXX11)
-  add_definitions(-DWIN32 -DOS_WIN -D_MBCS -DWIN32_LEAN_AND_MEAN -DNOGDI -DPLATFORM_WINDOWS)
+  add_definitions(-DNOMINMAX -D_WIN32_WINNT=0x0A00)
+  add_definitions(-DWIN32_LEAN_AND_MEAN -DNOGDI -DPLATFORM_WINDOWS)
   add_definitions(-DTENSORFLOW_USE_EIGEN_THREADPOOL -DEIGEN_HAS_C99_MATH)
   add_definitions(-DTF_COMPILE_LIBRARY)
-  add_definitions(/bigobj /nologo /EHsc /GF /MP /Gm-)
+  add_compile_options(/bigobj /GF /MP /Gm-)
   # Suppress warnings to reduce build log size.
-  add_definitions(/wd4267 /wd4244 /wd4800 /wd4503 /wd4554 /wd4996 /wd4348 /wd4018)
-  add_definitions(/wd4099 /wd4146 /wd4267 /wd4305 /wd4307)
-  add_definitions(/wd4715 /wd4722 /wd4723 /wd4838 /wd4309 /wd4334)
-  add_definitions(/wd4003 /wd4244 /wd4267 /wd4503 /wd4506 /wd4800 /wd4996)
+  add_compile_options(/wd4267 /wd4244 /wd4800 /wd4503 /wd4554 /wd4996 /wd4348 /wd4018)
+  add_compile_options(/wd4099 /wd4146 /wd4267 /wd4305 /wd4307)
+  add_compile_options(/wd4715 /wd4722 /wd4723 /wd4838 /wd4309 /wd4334)
+  add_compile_options(/wd4003 /wd4244 /wd4267 /wd4503 /wd4506 /wd4800 /wd4996)
   # Suppress linker warnings.
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
   set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /ignore:4049 /ignore:4197 /ignore:4217 /ignore:4221")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
   set(CMAKE_CXX_FLAGS_DEBUG "/D_DEBUG /MDd /Ob2")
   set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /D_ITERATOR_DEBUG_LEVEL=0")
   set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} /D_ITERATOR_DEBUG_LEVEL=0")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /D_ITERATOR_DEBUG_LEVEL=0")
+
+  set(compiler_flags
+    CMAKE_CXX_FLAGS
+    CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_C_FLAGS
+    CMAKE_C_FLAGS_DEBUG
+    CMAKE_C_FLAGS_RELEASE
+  )
+  # No exception
+  foreach(flag ${compiler_flags})
+    string(REPLACE "/EHsc" "/EHs-c-" ${flag} "${${flag}}")
+  endforeach()
+  add_definitions(/D_HAS_EXCEPTIONS=0)
+  # Suppress 'noexcept used with no exception handling mode specified' warning
+  add_compile_options(/wd4577)
 
   # Try to avoid flaky failures due to failed generation of generate.stamp files.
   set(CMAKE_SUPPRESS_REGENERATION ON)
@@ -216,10 +230,6 @@ if (tensorflow_WIN_CPU_SIMD_OPTIONS)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${tensorflow_WIN_CPU_SIMD_OPTIONS}")
     endif()
   endif()
-endif()
-
-if (tensorflow_ENABLE_JEMALLOC_SUPPORT)
-  add_definitions(-DTENSORFLOW_USE_JEMALLOC -DJEMALLOC_EXPORT=)
 endif()
 
 # External dependencies
@@ -270,7 +280,6 @@ set(tensorflow_EXTERNAL_LIBRARIES
     protobuf::libprotobuf
     ${RE2_LIBRARIES}
     ${SQLITE_LIBRARIES}
-    ${MKL_LIBRARIES}
     #${double_conversion_STATIC_LIBRARIES}
     double-conversion
 )
@@ -331,12 +340,6 @@ if(tensorflow_ENABLE_GRPC_SUPPORT)
     list(APPEND tensorflow_EXTERNAL_DEPENDENCIES boringssl)
   endif()
 endif()
-if(tensorflow_ENABLE_JEMALLOC_SUPPORT)
-  include(jemalloc)
-  list(APPEND tensorflow_EXTERNAL_LIBRARIES ${jemalloc_STATIC_LIBRARIES})
-  list(APPEND tensorflow_EXTERNAL_DEPENDENCIES jemalloc)
-  include_directories(${jemalloc_INCLUDE_DIRS})
-endif()
 if(tensorflow_ENABLE_SNAPPY_SUPPORT)
   find_package(Snappy REQUIRED)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES Snappy::snappy)
@@ -351,13 +354,15 @@ if(HAIKU)
   list(APPEND tensorflow_EXTERNAL_LIBRARIES network)
 endif()
 
+# MKL Support
 if(tensorflow_ENABLE_MKL_SUPPORT)
-  add_definitions(-DINTEL_MKL -DEIGEN_USE_VML -fopenmp)
+  add_definitions(-DINTEL_MKL -DEIGEN_USE_VML -DENABLE_MKL -fopenmp)
   include_directories("${MKL_INCLUDE_DIR}")
+  list(APPEND tensorflow_EXTERNAL_LIBRARIES ${MKL_LIBRARIES})
   if (tensorflow_ENABLE_MKLDNN_SUPPORT)
     list(APPEND tensorflow_EXTERNAL_LIBRARIES ${MKLDNN_LIBRARIES})
   else (tensorflow_ENABLE_MKLDNN_SUPPORT)
-    add_definitions(-DINTEL_MKL_ML)
+    add_definitions(-DINTEL_MKL_ML_ONLY)
   endif()
 endif()
 
@@ -402,24 +407,45 @@ if (tensorflow_ENABLE_GPU)
   set(TF_EXTRA_CUDA_CAPABILITIES_52 "5.2")
   set(CUDA_NVCC_FLAGS_30 "-gencode arch=compute_30,code=\"sm_30,compute_30\"")
   set(CUDA_NVCC_FLAGS_35 "-gencode arch=compute_35,code=\"sm_35,compute_35\"")
-  set(CUDA_NVCC_FLAGS_52 "-gencode arch=compute_52,code=\"sm_30,compute_52\"")
+  set(CUDA_NVCC_FLAGS_52 "-gencode arch=compute_52,code=\"sm_52,compute_52\"")
+  set(CUDA_NVCC_FLAGS_60 "-gencode arch=compute_60,code=\"sm_60,compute_60\"")
+  set(CUDA_NVCC_FLAGS_61 "-gencode arch=compute_61,code=\"sm_61,compute_61\"")
+  set(CUDA_NVCC_FLAGS_70 "-gencode arch=compute_70,code=\"sm_70,compute_70\"")
   set(TF_CUDA_CAPABILITIES_30 "CudaVersion(\"3.0\")")
   set(TF_CUDA_CAPABILITIES_35 "CudaVersion(\"3.5\")")
   set(TF_CUDA_CAPABILITIES_52 "CudaVersion(\"5.2\")")
+  set(TF_CUDA_CAPABILITIES_60 "CudaVersion(\"6.0\")")
+  set(TF_CUDA_CAPABILITIES_61 "CudaVersion(\"6.1\")")
+  set(TF_CUDA_CAPABILITIES_70 "CudaVersion(\"7.0\")")
   if(tensorflow_CUDA_30)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_30})
-    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_30})
-    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_30})
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_30})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_30})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_30})
   endif()
   if(tensorflow_CUDA_35)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_35})
-    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_35})
-    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_35})
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_35})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_35})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_35})
   endif()
   if(tensorflow_CUDA_52)
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} ${CUDA_NVCC_FLAGS_52})
-    set(TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_LIST} ${TF_CUDA_CAPABILITIES_52})
-    set(TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_LIST} ${TF_EXTRA_CUDA_CAPABILITIES_52})
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_52})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_52})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_52})
+  endif()
+  if(tensorflow_CUDA_60)
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_60})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_60})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_60})
+  endif()
+  if(tensorflow_CUDA_61)
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_61})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_61})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_61})
+  endif()
+  if(tensorflow_CUDA_70)
+    list(APPEND CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS_70})
+    list(APPEND TF_CUDA_CAPABILITIES_LIST ${TF_CUDA_CAPABILITIES_70})
+    list(APPEND TF_EXTRA_CUDA_CAPABILITIES_LIST ${TF_EXTRA_CUDA_CAPABILITIES_70})
   endif()
   join("${TF_CUDA_CAPABILITIES_LIST}" "," TF_CUDA_CAPABILITIES)
   join("${TF_EXTRA_CUDA_CAPABILITIES_LIST}" "," TF_EXTRA_CUDA_CAPABILITIES)
@@ -454,6 +480,12 @@ if (tensorflow_ENABLE_GPU)
     else()
       set(TF_CUDA_VERSION "9.2")
     endif()
+  elseif(${CUDA_VERSION} STREQUAL "10.0")
+    if(WIN32)
+      set(TF_CUDA_VERSION "64_100")
+    else()
+      set(TF_CUDA_VERSION "10.0")
+    endif()
   endif()
   if(NOT CUDNN_VERSION)
     set(CUDNN_VERSION "5")
@@ -473,7 +505,6 @@ if (tensorflow_ENABLE_GPU)
   endif(UNIX)
   set(CUDA_INCLUDE ${CUDA_TOOLKIT_TARGET_DIR}/include ${CUDA_TOOLKIT_TARGET_DIR}/include/crt ${CUDA_TOOLKIT_TARGET_DIR}/extras/CUPTI/include)
   include_directories(${CUDA_INCLUDE})
-  add_definitions(-DGOOGLE_CUDA=1 -DTF_EXTRA_CUDA_CAPABILITIES=${TF_EXTRA_CUDA_CAPABILITIES})
 
   # create cuda_config.h
   configure_file(cuda_config.h.in ${tensorflow_source_dir}/third_party/gpus/cuda/cuda_config.h)
@@ -482,6 +513,12 @@ if (tensorflow_ENABLE_GPU)
   if(UNIX)
    execute_process(COMMAND ln -snf "${CUDA_TOOLKIT_TARGET_DIR}/extras" "${tensorflow_source_dir}/third_party/gpus/cuda/")
   endif(UNIX)
+  if (WIN32)
+    add_definitions(-DGOOGLE_CUDA=1 -DTF_EXTRA_CUDA_CAPABILITIES=${TF_EXTRA_CUDA_CAPABILITIES})
+  else (WIN32)
+    # Without these double quotes, cmake in Linux makes it "-DTF_EXTRA_CUDA_CAPABILITIES=3.7, -D5.2, ..." for cc, which incurs build breaks
+    add_definitions(-DGOOGLE_CUDA=1 -D"TF_EXTRA_CUDA_CAPABILITIES=${TF_EXTRA_CUDA_CAPABILITIES}")
+  endif (WIN32)
 
   if (WIN32)
     # add cudnn
@@ -532,7 +569,6 @@ if (tensorflow_ENABLE_GPU)
     ${CUDA_TOOLKIT_TARGET_DIR}/include/cuComplex.h
     ${CUDA_TOOLKIT_TARGET_DIR}/include/cublas_v2.h
     ${CUDA_TOOLKIT_TARGET_DIR}/include/cusolverDn.h
-    ${CUDA_TOOLKIT_TARGET_DIR}/include/cuda_fp16.h
     ${CUDA_TOOLKIT_TARGET_DIR}/include/device_functions.h
     ${CUDA_TOOLKIT_TARGET_DIR}/include/cufft.h
     ${CUDA_TOOLKIT_TARGET_DIR}/include/curand.h
@@ -607,14 +643,3 @@ EXPORT(PACKAGE Tensorflow)
 SET(TENSORFLOW_INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/include/tensorflow")
 CONFIGURE_FILE(TensorflowConfig.cmake.in "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake")
 INSTALL(FILES "${PROJECT_BINARY_DIR}/TensorflowConfig.cmake" DESTINATION "share/tensorflow/cmake")
-
-MESSAGE(STATUS "<<< Gentoo configuration >>>
-Build type      ${CMAKE_BUILD_TYPE}
-Install path    ${CMAKE_INSTALL_PREFIX}
-Compiler flags:
-C               ${CMAKE_C_FLAGS}
-C++             ${CMAKE_CXX_FLAGS}
-Linker flags:
-Executable      ${CMAKE_EXE_LINKER_FLAGS}
-Module          ${CMAKE_MODULE_LINKER_FLAGS}
-Shared          ${CMAKE_SHARED_LINKER_FLAGS}\n")

@@ -22,6 +22,7 @@ from __future__ import print_function
 from tensorflow.contrib.estimator.python.estimator.baseline import *
 from tensorflow.contrib.estimator.python.estimator.boosted_trees import *
 from tensorflow.contrib.estimator.python.estimator.dnn import *
+from tensorflow.contrib.estimator.python.estimator.dnn_with_layer_annotations import *
 from tensorflow.contrib.estimator.python.estimator.dnn_linear_combined import *
 from tensorflow.contrib.estimator.python.estimator.early_stopping import *
 from tensorflow.contrib.estimator.python.estimator.export import *
@@ -33,6 +34,8 @@ from tensorflow.contrib.estimator.python.estimator.logit_fns import *
 from tensorflow.contrib.estimator.python.estimator.multi_head import *
 from tensorflow.contrib.estimator.python.estimator.replicate_model_fn import *
 from tensorflow.contrib.estimator.python.estimator.rnn import *
+from tensorflow.contrib.estimator.python.estimator.saved_model_estimator import *
+from tensorflow.python.estimator.export.export import *
 
 from tensorflow.python.util.all_util import remove_undocumented
 # pylint: enable=unused-import,line-too-long,wildcard-import
@@ -43,6 +46,7 @@ _allowed_symbols = [
     'clip_gradients_by_norm',
     'forward_features',
     'InMemoryEvaluatorHook',
+    'make_stop_at_checkpoint_step_hook',
     'logistic_regression_head',
     'multi_class_head',
     'multi_head',
@@ -70,6 +74,11 @@ _allowed_symbols = [
     'stop_if_higher_hook',
     'stop_if_no_increase_hook',
     'stop_if_no_decrease_hook',
+    'build_raw_supervised_input_receiver_fn',
+    'build_supervised_input_receiver_fn_from_input_fn',
+    'SavedModelEstimator',
+    'DNNClassifierWithLayerAnnotations',
+    'DNNRegressorWithLayerAnnotations',
 ]
 
 remove_undocumented(__name__, allowed_exception_list=_allowed_symbols)

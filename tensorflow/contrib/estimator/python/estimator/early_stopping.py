@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import collections
 import operator
 import os
 
@@ -55,6 +56,13 @@ def make_early_stopping_hook(estimator,
   train_spec = tf.estimator.TrainSpec(..., hooks=[hook])
   tf.estimator.train_and_evaluate(estimator, train_spec, ...)
   ```
+
+  Caveat: Current implementation supports early-stopping both training and
+  evaluation in local mode. In distributed mode, training can be stopped but
+  evaluation (where it's a separate job) will indefinitely wait for new model
+  checkpoints to evaluate, so you will need other means to detect and stop it.
+  Early-stopping evaluation in distributed mode requires changes in
+  `train_and_evaluate` API and will be addressed in a future revision.
 
   Args:
     estimator: A `tf.estimator.Estimator` instance.
@@ -108,6 +116,13 @@ def stop_if_higher_hook(estimator,
   tf.estimator.train_and_evaluate(estimator, train_spec, ...)
   ```
 
+  Caveat: Current implementation supports early-stopping both training and
+  evaluation in local mode. In distributed mode, training can be stopped but
+  evaluation (where it's a separate job) will indefinitely wait for new model
+  checkpoints to evaluate, so you will need other means to detect and stop it.
+  Early-stopping evaluation in distributed mode requires changes in
+  `train_and_evaluate` API and will be addressed in a future revision.
+
   Args:
     estimator: A `tf.estimator.Estimator` instance.
     metric_name: `str`, metric to track. "loss", "accuracy", etc.
@@ -157,6 +172,13 @@ def stop_if_lower_hook(estimator,
   tf.estimator.train_and_evaluate(estimator, train_spec, ...)
   ```
 
+  Caveat: Current implementation supports early-stopping both training and
+  evaluation in local mode. In distributed mode, training can be stopped but
+  evaluation (where it's a separate job) will indefinitely wait for new model
+  checkpoints to evaluate, so you will need other means to detect and stop it.
+  Early-stopping evaluation in distributed mode requires changes in
+  `train_and_evaluate` API and will be addressed in a future revision.
+
   Args:
     estimator: A `tf.estimator.Estimator` instance.
     metric_name: `str`, metric to track. "loss", "accuracy", etc.
@@ -205,6 +227,13 @@ def stop_if_no_increase_hook(estimator,
   train_spec = tf.estimator.TrainSpec(..., hooks=[hook])
   tf.estimator.train_and_evaluate(estimator, train_spec, ...)
   ```
+
+  Caveat: Current implementation supports early-stopping both training and
+  evaluation in local mode. In distributed mode, training can be stopped but
+  evaluation (where it's a separate job) will indefinitely wait for new model
+  checkpoints to evaluate, so you will need other means to detect and stop it.
+  Early-stopping evaluation in distributed mode requires changes in
+  `train_and_evaluate` API and will be addressed in a future revision.
 
   Args:
     estimator: A `tf.estimator.Estimator` instance.
@@ -256,6 +285,13 @@ def stop_if_no_decrease_hook(estimator,
   tf.estimator.train_and_evaluate(estimator, train_spec, ...)
   ```
 
+  Caveat: Current implementation supports early-stopping both training and
+  evaluation in local mode. In distributed mode, training can be stopped but
+  evaluation (where it's a separate job) will indefinitely wait for new model
+  checkpoints to evaluate, so you will need other means to detect and stop it.
+  Early-stopping evaluation in distributed mode requires changes in
+  `train_and_evaluate` API and will be addressed in a future revision.
+
   Args:
     estimator: A `tf.estimator.Estimator` instance.
     metric_name: `str`, metric to track. "loss", "accuracy", etc.
@@ -306,7 +342,8 @@ def read_eval_metrics(eval_dir):
         metrics[value.tag] = value.simple_value
     if metrics:
       eval_metrics_dict[event.step] = metrics
-  return eval_metrics_dict
+  return collections.OrderedDict(
+      sorted(eval_metrics_dict.items(), key=lambda t: t[0]))
 
 
 def _stop_if_threshold_crossed_hook(estimator, metric_name, threshold,
@@ -394,10 +431,11 @@ def _summaries(eval_dir):
   Yields:
     `tensorflow.Event` object read from the event files.
   """
-  for event_file in gfile.Glob(
-      os.path.join(eval_dir, _EVENT_FILE_GLOB_PATTERN)):
-    for event in summary_iterator.summary_iterator(event_file):
-      yield event
+  if gfile.Exists(eval_dir):
+    for event_file in gfile.Glob(
+        os.path.join(eval_dir, _EVENT_FILE_GLOB_PATTERN)):
+      for event in summary_iterator.summary_iterator(event_file):
+        yield event
 
 
 def _get_or_create_stop_var():
