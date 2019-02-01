@@ -283,7 +283,7 @@ set(tensorflow_EXTERNAL_LIBRARIES
     ${SQLITE_LIBRARIES}
     #${double_conversion_STATIC_LIBRARIES}
     double-conversion
-    ${abseil_cpp_LIBRARIES}
+    ${abseil_cpp_STATIC_LIBRARIES}
 )
 
 set(tensorflow_EXTERNAL_DEPENDENCIES
@@ -291,6 +291,7 @@ set(tensorflow_EXTERNAL_DEPENDENCIES
     gemmlowp
     cub
     fft2d
+    abseil_cpp_build
     #double_conversion
 )
 

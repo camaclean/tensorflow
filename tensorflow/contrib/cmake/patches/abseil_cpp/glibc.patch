@@ -1,0 +1,14 @@
+diff --git a/absl/base/policy_checks.h b/absl/base/policy_checks.h
+index 0a07fc0..ae4dac3 100644
+--- a/absl/base/policy_checks.h
++++ b/absl/base/policy_checks.h
+@@ -87,9 +87,6 @@
+ // (for instance pthread_setname_np):
+ // https://sourceware.org/ml/libc-alpha/2010-05/msg00000.html
+ #if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
+-#if !__GLIBC_PREREQ(2, 12)
+-#error "Minimum required version of glibc is 2.12."
+-#endif
+ #endif
+ 
+ #if defined(_STLPORT_VERSION)

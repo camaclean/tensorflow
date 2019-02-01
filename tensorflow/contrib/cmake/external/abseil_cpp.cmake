@@ -38,10 +38,10 @@ else (systemlib_ABSEIL_CPP)
 
   include (ExternalProject)
 
-  set(abseil_cpp_INCLUDE_DIR ${CMAKE_BINARY_DIR}/abseil_cpp/src/abseil_cpp_build)
+  set(abseil_cpp_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/abseil_cpp/src/abseil_cpp_build)
   set(abseil_cpp_URL https://github.com/abseil/abseil-cpp.git)
   set(abseil_cpp_TAG master)
-  set(abseil_cpp_BUILD ${CMAKE_BINARY_DIR}/abseil_cpp/src/abseil_cpp_build)
+  set(abseil_cpp_BUILD ${CMAKE_CURRENT_BINARY_DIR}/abseil_cpp/src/abseil_cpp_build)
 
   if(WIN32)
     if(${CMAKE_GENERATOR} MATCHES "Visual Studio.*")
@@ -90,6 +90,7 @@ else (systemlib_ABSEIL_CPP)
       BUILD_BYPRODUCTS ${abseil_cpp_STATIC_LIBRARIES}
       BUILD_COMMAND ${CMAKE_COMMAND} --build . --config Release
       COMMAND ${CMAKE_COMMAND} --build . --config Release
+      PATCH_COMMAND patch -p1 -i "${CMAKE_CURRENT_SOURCE_DIR}/patches/abseil_cpp/glibc.patch"
       INSTALL_COMMAND ""
       CMAKE_CACHE_ARGS
           -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=${tensorflow_ENABLE_POSITION_INDEPENDENT_CODE}
