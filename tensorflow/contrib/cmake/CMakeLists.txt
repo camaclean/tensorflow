@@ -245,6 +245,7 @@ include(gemmlowp)
 #include(jsoncpp)
 include(farmhash)
 include(fft2d)
+include(abseil_cpp)
 find_package(jsoncpp REQUIRED)
 find_package(highwayhash REQUIRED)
 find_package(nsync REQUIRED)
@@ -282,6 +283,7 @@ set(tensorflow_EXTERNAL_LIBRARIES
     ${SQLITE_LIBRARIES}
     #${double_conversion_STATIC_LIBRARIES}
     double-conversion
+    ${abseil_cpp_LIBRARIES}
 )
 
 set(tensorflow_EXTERNAL_DEPENDENCIES
@@ -302,6 +304,7 @@ include_directories(
     #${ZLIB_INCLUDE_DIRS}
     ${GIF_INCLUDE_DIR}
     ${JPEG_INCLUDE_DIR}
+    ${abseil_cpp_INCLUDE_DIR}
     $<TARGET_PROPERTY:Eigen3::Eigen,INTERFACE_INCLUDE_DIRECTORIES>
     #${EIGEN3_INCLUDE_DIRS}
     ${gemmlowp_INCLUDE_DIR}
